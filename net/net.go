@@ -1,0 +1,94 @@
+package net
+
+import (
+	"fmt"
+	"net"
+	"strings"
+
+	"github.com/cakturk/go-netstat/netstat"
+	"github.com/seancfoley/ipaddress-go/ipaddr"
+	"github.com/vishvananda/netlink"
+)
+
+// GetHostIPByIndex
+//
+//	@Description: 获取网段的第n个主机位的ip地址
+//	@param cidr
+//	@return net.IP
+func GetHostIPByIndex(cidr string, index int) net.IP {
+	addrString := ipaddr.NewIPAddressString(cidr)
+	addr := addrString.GetAddress()
+	mask := addr.GetNetworkMask()
+	networkAddr, _ := addr.Mask(mask)
+
+	subnet := ipaddr.NewIPAddressString(networkAddr.String()).GetAddress().WithoutPrefixLen()
+	iterator := subnet.Iterator()
+	i := 0
+	for next := iterator.Next(); next != nil; next = iterator.Next() {
+		i++
+		if i == index+1 {
+			return next.GetNetIP()
+		}
+	}
+	return nil
+}
+
+// CIDR2IPorNetworkMask
+//
+//	@Description: 将CIDR转换成IP地址和掩码
+//	@param cidr
+//	@return string
+//	@return string
+func CIDR2IPorNetworkMask(cidr string) (string, string) {
+	ipAddrObj := ipaddr.NewIPAddressString(cidr).GetAddress()
+	return ipAddrObj.GetNetIPAddr().IP.String(), ipAddrObj.GetNetworkMask().String()
+}
+
+// PhysicsCNIAddress
+//
+//	@Description: 物理网卡IP地址
+//	@return []string
+func PhysicsCNIAddress() ([]string, error) {
+	var addrs []string
+	list, err := netlink.LinkList()
+	if err != nil {
+		return nil, fmt.Errorf("netlink.LinkList() : %w", err)
+	}
+
+	for _, link := range list {
+		// 跳过 MAC地址前缀为02:42 的网卡 libvernet 网卡： virbr0
+		if link.Attrs().Name == "lo" || link.Attrs().Name == "veth" ||
+			link.Type() == "tuntap" || link.Attrs().HardwareAddr.String() == "" ||
+			strings.HasPrefix(link.Attrs().HardwareAddr.String(), "02:42") ||
+			strings.HasPrefix(link.Attrs().Name, "virbr") {
+			continue
+		}
+		addrList, err := netlink.AddrList(link, netlink.FAMILY_V4)
+		if err != nil {
+			return nil, fmt.Errorf("netlink.AddrList() : %w", err)
+		}
+		for _, addr := range addrList {
+			addrs = append(addrs, addr.IP.String())
+		}
+	}
+	if len(addrs) == 0 {
+		return append(addrs, "127.0.0.1"), nil
+	}
+	return addrs, nil
+}
+
+func SSHPort() int {
+	socks, err := netstat.TCPSocks(netstat.NoopFilter)
+	if err != nil {
+		return 0
+	}
+	for _, e := range socks {
+		if e.Process == nil {
+			continue
+		}
+		if e.Process.Name == "sshd" {
+			return int(e.LocalAddr.Port)
+		}
+	}
+	return 0
+}
