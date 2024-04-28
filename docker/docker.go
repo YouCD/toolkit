@@ -238,12 +238,34 @@ func (d *Docker) ContainerState(ctx context.Context, container string) string {
 //	@receiver d
 //	@param container
 //	@return error
-func (d *Docker) ContainerStart(ctx context.Context, containerName string) error {
-	inspect, err := d.Inspect(ctx, containerName)
-	if err != nil {
-		return err
+func (d *Docker) ContainerStart(ctx context.Context, containers ...string) error {
+	var errs []error
+	for _, containerName := range containers {
+		inspect, err := d.Inspect(ctx, containerName)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		if err = d.DockerCLIClient.Client().ContainerStart(ctx, inspect.ID, container.StartOptions{}); err != nil {
+			errs = append(errs, err)
+		}
 	}
-	return d.DockerCLIClient.Client().ContainerStart(ctx, inspect.ID, container.StartOptions{}) //nolint
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+	return nil
+}
+
+// ContainerList
+//
+//	@Description: 获取容器列表
+//	@receiver d
+//	@param ctx
+//	@return []string
+//	@return error
+func (d *Docker) ContainerList(ctx context.Context) ([]types.Container, error) {
+	//nolint:wrapcheck
+	return d.DockerCLIClient.Client().ContainerList(ctx, container.ListOptions{})
 }
 
 // ContainerStop
