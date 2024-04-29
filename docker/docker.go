@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -41,6 +42,7 @@ var (
 	ErrDockerComposeProjectNotFound = errors.New("docker Compose project not found")
 	ErrDockerNetworkPollExist       = errors.New("DockerIP网络池已分配")
 	ErrNetworkExist                 = errors.New("docker network exist")
+	ErrNoYaml                       = errors.New("没有找到ymal文件")
 )
 var (
 	d *Docker
@@ -887,4 +889,37 @@ func (d *Docker) ContainerImageSha256(ctx context.Context, name string) (string,
 		return "", fmt.Errorf("inspect container, error: %w", err)
 	}
 	return inspect.Image, nil
+}
+
+// ParserYamlFiles
+//
+//	@Description: 解析yaml文件
+//	@receiver d
+//	@param ctx
+//	@param yamlFiles
+//	@return map[string][]string
+//	@return error
+func (d *Docker) ParserYamlFiles(ctx context.Context, yamlFiles ...string) (map[string][]string, error) {
+	if len(yamlFiles) == 0 {
+		return nil, ErrNoYaml
+	}
+	list, err := d.ComposeList(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("获取compose stack列表失败, err: %w", err)
+	}
+
+	sort.Strings(yamlFiles)
+
+	projects := make(map[string]string)
+	for _, stack := range list {
+		projects[stack.Name] = stack.ConfigFiles
+	}
+
+	sortProjects := make(map[string][]string)
+	for pg, s := range projects {
+		configs := strings.Split(s, ",")
+		sort.Strings(configs)
+		sortProjects[pg] = configs
+	}
+	return sortProjects, nil
 }
