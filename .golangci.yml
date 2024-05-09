@@ -34,7 +34,7 @@ linters:
     - exhaustivestruct
     - golint
     - maligned
-
+    - mnd
     - gci
     - gochecknoglobals
     - exhaustive
