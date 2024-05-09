@@ -19,7 +19,7 @@ import (
 
 type Git struct {
 	sshURL     string
-	storage    memory.Storage
+	storage    *memory.Storage
 	publicKeys *ssh.PublicKeys
 	ref        string
 	fs         billy.Filesystem
@@ -47,7 +47,7 @@ func NewGit(sshURLOrHTTPURL, ref string) (*Git, error) {
 
 	return &Git{
 		sshURL:     sshURL,
-		storage:    *memory.NewStorage(),
+		storage:    memory.NewStorage(),
 		publicKeys: publicKeys,
 		ref:        ref,
 		fs:         memfs.New(),
@@ -78,7 +78,7 @@ func NewGitInit(sshURLOrHTTPURL, ref string) (*Git, error) {
 //	@Description: 克隆代码
 //	@receiver g
 func (g *Git) Clone(depth int) error {
-	Repository, err := git.Clone(&g.storage, g.fs, &git.CloneOptions{
+	Repository, err := git.Clone(g.storage, g.fs, &git.CloneOptions{
 		InsecureSkipTLS: true,
 		URL:             g.sshURL,
 		ReferenceName:   plumbing.ReferenceName(g.ref),
