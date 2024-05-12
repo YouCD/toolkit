@@ -23,6 +23,10 @@ var (
 	fileName = fmt.Sprintf("install_%s.log", format)
 )
 
+func LoggerIsNil() bool {
+	return logger == nil
+}
+
 // SetLogLevel
 //
 //	@Description:默认级别是debug，实时修改日志级别
