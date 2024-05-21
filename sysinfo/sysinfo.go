@@ -4,6 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/hairyhenderson/go-which"
 	"github.com/minio/dperf/pkg/dperf"
@@ -14,15 +21,8 @@ import (
 	"github.com/youcd/toolkit/net"
 	"github.com/youcd/toolkit/sysinfo/types"
 	"github.com/youcd/toolkit/systemd"
-
-	"os"
-	"os/exec"
-	"regexp"
-	"strings"
-	"sync"
-	"time"
-
 	"go.uber.org/zap/buffer"
+	"golang.org/x/sys/unix"
 )
 
 var (
@@ -247,19 +247,61 @@ func service(ctx context.Context, h *types.Host, services []string) error {
 }
 
 func cGroupVersion(h *types.Host) error {
-	out, err := exec.Command("stat", "-fc", "%T", "/sys/fs/cgroup").Output()
-	if err != nil {
-		return ErrCheckCGroupVersion
-	}
-	switch strings.ReplaceAll(string(out), "\n", "") {
-	case "tmpfs":
-		h.CGroupVersion = types.CGroupVersionV1
-	case "cgroup2fs":
-		h.CGroupVersion = types.CGroupVersionV2
+	mode := Mode()
+	switch mode {
+	case Unavailable:
+		h.CGroupVersion = types.CGroupVersionUnavailable
+		return nil
+	case Legacy:
+		h.CGroupVersion = types.CGroupVersionLegacy
+		return nil
+	case Hybrid:
+		h.CGroupVersion = types.CGroupVersionHybrid
+		return nil
+	case Unified:
+		h.CGroupVersion = types.CGroupVersionUnified
+		return nil
 	default:
-		h.CGroupVersion = types.CGroupVersionUnknown
+		return fmt.Errorf("cgroup version error: %w", ErrCheckCGroupVersion)
 	}
-	return nil
+}
+
+type CGMode int
+
+const (
+	// Unavailable cgroup mountpoint
+	Unavailable CGMode = iota
+	// Legacy cgroups v1
+	Legacy
+	// Hybrid with cgroups v1 and v2 controllers mounted
+	Hybrid
+	// Unified with only cgroups v2 mounted
+	Unified
+)
+
+const unifiedMountpoint = "/sys/fs/cgroup"
+
+func Mode() CGMode {
+	var cgMode CGMode
+
+	var st unix.Statfs_t
+	if err := unix.Statfs(unifiedMountpoint, &st); err != nil {
+		cgMode = Unavailable
+		return cgMode
+	}
+	switch st.Type {
+	case unix.CGROUP2_SUPER_MAGIC:
+		cgMode = Unified
+	default:
+		cgMode = Legacy
+		if err := unix.Statfs(filepath.Join(unifiedMountpoint, "unified"), &st); err != nil {
+			return cgMode
+		}
+		if st.Type == unix.CGROUP2_SUPER_MAGIC {
+			cgMode = Hybrid
+		}
+	}
+	return cgMode
 }
 
 // diskPerformance

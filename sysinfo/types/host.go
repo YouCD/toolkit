@@ -15,9 +15,10 @@ type (
 )
 
 const (
-	CGroupVersionV1      CGroupVersion = "tmpfs"
-	CGroupVersionV2      CGroupVersion = "cgroup2fs"
-	CGroupVersionUnknown CGroupVersion = "unknown"
+	CGroupVersionLegacy      CGroupVersion = "Legacy"
+	CGroupVersionHybrid      CGroupVersion = "Hybrid"
+	CGroupVersionUnified     CGroupVersion = "Unified"
+	CGroupVersionUnavailable CGroupVersion = "Unavailable"
 
 	OSArchX8664 OSArch = "x86_64"
 	OSArchOther OSArch = "other"
