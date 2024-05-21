@@ -71,28 +71,48 @@ func NewSystemd(ctx context.Context, connectionStateChan chan ConnectionState, m
 //	@Description:疯狂连接
 //	@receiver s
 func (s *Systemd) guardConnected(ctx context.Context) {
+	retryInterval := time.Second
 	for {
-		if s.conn == nil {
-			break
-		}
-		if !s.conn.Connected() {
-			s.mux.Lock()
-			s.totalConnect++
-			s.mux.Unlock()
-			conn, err := dbus.NewSystemdConnectionContext(ctx)
-			if err != nil {
-				// 连接失败，通过通道向调用者发送状态信息
+		select {
+		case <-ctx.Done():
+			return // context canceled, exit the loop
+		default:
+			if s.conn == nil || !s.conn.Connected() {
+				s.mux.Lock()
+				s.totalConnect++
+				s.mux.Unlock()
+
+				conn, err := dbus.NewSystemdConnectionContext(ctx)
+				if err != nil {
+					// 连接失败，通过通道向调用者发送状态信息
+					if s.connectionStateChan != nil {
+						s.connectionStateChan <- ConnectionState{
+							Connected:     false,
+							TotalAttempts: s.totalConnect,
+							Err:           err,
+						}
+					}
+					// 指数回退策略
+					time.Sleep(retryInterval)
+					retryInterval *= 2
+					if retryInterval > time.Minute {
+						retryInterval = time.Minute // 限制最大重试间隔
+					}
+					continue
+				}
+				s.conn = conn
 				if s.connectionStateChan != nil {
 					s.connectionStateChan <- ConnectionState{
-						Connected:     false,
+						Connected:     true,
 						TotalAttempts: s.totalConnect,
-						Err:           err,
 					}
 				}
-				time.Sleep(time.Second * 1)
-				continue
+				// 连接成功后重置重试间隔
+				retryInterval = time.Second
+			} else {
+				// 连接正常时睡眠一段时间，避免占用CPU
+				time.Sleep(time.Second * 10)
 			}
-			s.conn = conn
 		}
 	}
 }
