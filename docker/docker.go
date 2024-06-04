@@ -42,6 +42,7 @@ var (
 	ErrDockerComposeProjectNotFound = errors.New("docker Compose project not found")
 	ErrDockerNetworkPollExist       = errors.New("DockerIP网络池已分配")
 	ErrNetworkExist                 = errors.New("docker network exist")
+	ErrNetworkNotExist              = errors.New("docker network not exist")
 	ErrNoYaml                       = errors.New("没有找到ymal文件")
 )
 var (
@@ -691,6 +692,9 @@ func (d *Docker) NetworkListByName(ctx context.Context, netName string) (*types.
 	list, err := d.DockerCLIClient.Client().NetworkList(ctx, types.NetworkListOptions{Filters: filters.NewArgs(filters.KeyValuePair{Key: "name", Value: netName})})
 	if err != nil {
 		return nil, fmt.Errorf("list Network,err:%w", err)
+	}
+	if len(list) == 0 {
+		return nil, ErrNetworkNotExist
 	}
 	return &list[0], nil
 
