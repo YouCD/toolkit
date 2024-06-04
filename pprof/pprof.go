@@ -3,7 +3,7 @@ package pprof
 import (
 	"log"
 	"net/http"
-	_ "net/http/pprof"
+	_ "net/http/pprof" //nolint:gosec
 )
 
 func Pprof(addr string) {
@@ -11,6 +11,7 @@ func Pprof(addr string) {
 	if addrTmp == "" {
 		addrTmp = ":6060"
 	}
+	//nolint:gosec
 	if err := http.ListenAndServe(addrTmp, nil); err != nil {
 		log.Fatal(err)
 	}

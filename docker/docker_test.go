@@ -37,9 +37,16 @@ func TestDocker_ContainerImageSha256(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sha256, err := d.ContainerImageSha256(ctx, "gitlab")
+	//sha256, err := d.ContainerImageSha256(ctx, "gitlab")
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	//fmt.Println(sha256)
+
+	name, err := d.NetworkListByName(ctx, "xxx_default")
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println(sha256)
+	fmt.Println(name)
+
 }

@@ -77,6 +77,7 @@ func (s *Systemd) guardConnected(ctx context.Context) {
 		case <-ctx.Done():
 			return // context canceled, exit the loop
 		default:
+			//nolint:nestif
 			if s.conn == nil || !s.conn.Connected() {
 				s.mux.Lock()
 				s.totalConnect++

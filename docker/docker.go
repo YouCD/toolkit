@@ -651,7 +651,7 @@ func (d *Docker) matchAuthConfig(regImage string) (string, error) {
 func (d *Docker) NetworkCreate(ctx context.Context, netName, ipCIDR string) error {
 	list, err := d.DockerCLIClient.Client().NetworkList(ctx, types.NetworkListOptions{Filters: filters.NewArgs(filters.KeyValuePair{Key: "name", Value: netName})})
 	if err != nil {
-		return fmt.Errorf("list net %s,err:%s", netName, err.Error()) //nolint
+		return fmt.Errorf("list net %s,err:%w", netName, err)
 	}
 	if len(list) > 0 {
 		return ErrNetworkExist
@@ -677,6 +677,23 @@ func (d *Docker) NetworkCreate(ctx context.Context, netName, ipCIDR string) erro
 	}
 
 	return nil
+}
+
+// NetworkListByName
+//
+//	@Description: 通过名称获取 Network
+//	@receiver d
+//	@param ctx
+//	@param netName
+//	@return []types.NetworkResource
+//	@return error
+func (d *Docker) NetworkListByName(ctx context.Context, netName string) (*types.NetworkResource, error) {
+	list, err := d.DockerCLIClient.Client().NetworkList(ctx, types.NetworkListOptions{Filters: filters.NewArgs(filters.KeyValuePair{Key: "name", Value: netName})})
+	if err != nil {
+		return nil, fmt.Errorf("list Network,err:%w", err)
+	}
+	return &list[0], nil
+
 }
 
 // ComposeServiceUp  docker-compose up

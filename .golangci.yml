@@ -28,12 +28,8 @@ linters:
     - wsl
     - tagalign
     - gomnd
-    - nosnakecase
     - lll
     - funlen
-    - exhaustivestruct
-    - golint
-    - maligned
     - mnd
     - gci
     - gochecknoglobals
@@ -42,13 +38,7 @@ linters:
     - exhaustruct
     - forbidigo
     - perfsprint
-    # 弃用的
-    - structcheck
-    - interfacer
-    - ifshort
-    - deadcode
-    - scopelint
-    - varcheck
+    - execinquery
 
 
 # 针对特定linters的设置
