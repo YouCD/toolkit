@@ -697,7 +697,6 @@ func (d *Docker) NetworkListByName(ctx context.Context, netName string) (*types.
 		return nil, ErrNetworkNotExist
 	}
 	return &list[0], nil
-
 }
 
 // ComposeServiceUp  docker-compose up
