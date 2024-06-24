@@ -1,6 +1,7 @@
 package net
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -8,6 +9,11 @@ import (
 	"github.com/cakturk/go-netstat/netstat"
 	"github.com/seancfoley/ipaddress-go/ipaddr"
 	"github.com/vishvananda/netlink"
+)
+
+var (
+	ErrNotFoundCNI  = errors.New("not found cni")
+	ErrNetplanApply = errors.New("netplan apply error")
 )
 
 // GetHostIPByIndex
@@ -75,6 +81,67 @@ func PhysicsCNIAddress() ([]string, error) {
 		return append(addrs, "127.0.0.1"), nil
 	}
 	return addrs, nil
+}
+
+// PhysicsCNI
+//
+//	@Description: 获取所有物理网卡
+//	@return []string
+//	@return error
+func PhysicsCNI() ([]string, error) {
+	cnis := make([]string, 0)
+	list, err := netlink.LinkList()
+	if err != nil {
+		return nil, fmt.Errorf("netlink.LinkList() : %w", err)
+	}
+
+	for _, link := range list {
+		// 跳过 MAC地址前缀为02:42 的网卡 libvernet 网卡： virbr0
+		if link.Attrs().Name == "lo" || link.Attrs().Name == "veth" ||
+			link.Type() == "tuntap" || link.Attrs().HardwareAddr.String() == "" ||
+			strings.HasPrefix(link.Attrs().HardwareAddr.String(), "02:42") ||
+			strings.HasPrefix(link.Attrs().Name, "virbr") {
+			continue
+		}
+		cnis = append(cnis, link.Attrs().Name)
+	}
+
+	return cnis, nil
+}
+
+// PhysicsCNIByAddress
+//
+//	@Description: 查找IP地址对应的网卡
+//	@param address
+//	@return string
+//	@return error
+func PhysicsCNIByAddress(address string) (string, error) {
+	list, err := netlink.LinkList()
+	if err != nil {
+		return "", fmt.Errorf("netlink.LinkList() : %w", err)
+	}
+
+	for _, link := range list {
+		// 跳过 MAC地址前缀为02:42 的网卡 libvernet 网卡： virbr0
+		if link.Attrs().Name == "lo" || link.Attrs().Name == "veth" ||
+			link.Type() == "tuntap" || link.Attrs().HardwareAddr.String() == "" ||
+			strings.HasPrefix(link.Attrs().HardwareAddr.String(), "02:42") ||
+			strings.HasPrefix(link.Attrs().Name, "virbr") {
+			continue
+		}
+		addrList, err := netlink.AddrList(link, netlink.FAMILY_V4)
+		if err != nil {
+			return "", fmt.Errorf("netlink.AddrList() : %w", err)
+		}
+		for _, addr := range addrList {
+			fmt.Println(addr.IP.String())
+			if address == addr.IP.String() {
+				return link.Attrs().Name, nil
+			}
+		}
+	}
+
+	return "", ErrNotFoundCNI
 }
 
 func SSHPort() int {
