@@ -110,3 +110,18 @@ func (e *Embed) copyEmbedDataFile(embedSrcFile, dstFile string) error {
 	}
 	return nil
 }
+
+// CopyEmbedDataFile
+//
+//	@Description: 从embed文件夹中复制文件
+//	@receiver e
+//	@param embedSrcFile
+//	@param dstFile
+//	@return error
+func (e *Embed) CopyEmbedDataFile(embedSrcFile, dstFile string) error {
+	if err := os.MkdirAll(filepath.Dir(dstFile), 0755); err != nil {
+		return fmt.Errorf("创建目标文件夹失败: %w", err)
+	}
+	// 拷贝文件
+	return e.copyEmbedDataFile(embedSrcFile, dstFile)
+}
