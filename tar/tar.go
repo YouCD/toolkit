@@ -30,34 +30,30 @@ type Progress struct {
 //
 //nolint:gocognit
 func ExtractTarZstOrGzipFile(src, dest string, progressChan chan string) error {
-	file, err := os.Open(src)
+	fileHandle, err := os.Open(src)
 	if err != nil {
 		return fmt.Errorf("打开文件: %s,err：%w", src, err)
 	}
-	defer file.Close()
+	defer fileHandle.Close()
 
 	var pg Progress
 	var reader io.Reader
 
 	switch strings.ToLower(filepath.Ext(src)) {
 	case ".gz":
-		gzipReader, err := gzip.NewReader(file)
+		gzipReader, err := gzip.NewReader(fileHandle)
 		if err != nil {
 			return fmt.Errorf("读取文件: %s,err：%w", src, err)
 		}
 		reader = gzipReader
 		defer gzipReader.Close()
 	case ".zst":
-		zstReader, err := zstd.NewReader(file)
+		zstReader, err := zstd.NewReader(fileHandle)
 		if err != nil {
 			return fmt.Errorf("读取文件: %s,err：%w", src, err)
 		}
 		reader = zstReader
 		defer zstReader.Close()
-	}
-
-	if err != nil {
-		return fmt.Errorf("读取文件: %s,err：%w", src, err)
 	}
 
 	tarReader := tar.NewReader(reader)
@@ -116,9 +112,7 @@ func pushMsg(progress Progress, progressChan chan string) {
 	if progressChan == nil {
 		return
 	}
-	if progressChan != nil {
-		progressChan <- fmt.Sprintf("file:%d dir:%d", progress.FileCount, progress.DirCount)
-	}
+	progressChan <- fmt.Sprintf("file:%d dir:%d", progress.FileCount, progress.DirCount)
 }
 
 // Dir
@@ -133,14 +127,14 @@ func Dir(src, dst string) error {
 		return err
 	}
 
-	file, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY, 0o755)
+	fileHandle, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY, 0o755)
 	if err != nil {
 		return fmt.Errorf("打开文件失败: %s,err：%w", dst, err)
 	}
 
-	defer file.Close()
+	defer fileHandle.Close()
 
-	if _, err = file.Write(data); err != nil {
+	if _, err = fileHandle.Write(data); err != nil {
 		return fmt.Errorf("写入文件失败: %s,err：%w", dst, err)
 	}
 	return nil
@@ -159,21 +153,21 @@ func GzOrZstFileWithDirFunc(src, dst string, dirFunc dirFunc) error {
 		return nil
 	}
 	// 创建文件
-	file, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY, 0644)
+	fileHandle, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("打开文件失败: %s,err：%w", dst, err)
 	}
-	defer file.Close()
+	defer fileHandle.Close()
 
 	// 添加 gzip 压缩，
 	var writer io.Writer
 	switch strings.ToLower(filepath.Ext(dst)) {
 	case ".gz":
-		gzipWriter := gzip.NewWriter(file)
+		gzipWriter := gzip.NewWriter(fileHandle)
 		writer = gzipWriter
 		defer gzipWriter.Close()
 	case ".zst":
-		zstReader, err := zstd.NewWriter(file)
+		zstReader, err := zstd.NewWriter(fileHandle)
 		if err != nil {
 			return fmt.Errorf("读取文件: %s,err：%w", src, err)
 		}
