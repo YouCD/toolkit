@@ -1,4 +1,4 @@
-package main
+package pkg
 
 import (
 	"fmt"
@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 )
 
 type Command interface {
@@ -21,12 +22,12 @@ type SSHConfig struct {
 	User           string
 	PrivateKeyPath string
 	Password       string // 新增密码字段
+	TimeOut        time.Duration
 }
 
 type ServiceInfo struct {
-	Host        string
-	ServiceName string
-	Command     string
+	Host    string
+	Command string
 }
 
 type ExecuteResult struct {
@@ -77,6 +78,7 @@ func (s *SSHCommand) SSHClient() (*ssh.Client, error) {
 		User:            s.Config.User,
 		Auth:            authMethods,
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         s.Config.TimeOut,
 	}
 
 	client, err := ssh.Dial("tcp", s.Config.Host+":22", config)
@@ -142,6 +144,7 @@ func (s *SCPCommand) SSHClient() (*ssh.Client, error) {
 		User:            s.Config.User,
 		Auth:            authMethods,
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         s.Config.TimeOut,
 	}
 
 	client, err := ssh.Dial("tcp", s.Config.Host+":22", config)
@@ -273,29 +276,6 @@ func (i *Invoker) AddCommand(cmd Command) {
 	i.Commands = append(i.Commands, cmd)
 }
 
-func (i *Invoker) ExecuteCheckCommand() {
-	i.CheckResult = make(map[string][]ExecuteCheckResult)
-	for _, cmd := range i.Commands {
-		i.wg.Add(1)
-		go func(cmd Command) {
-			defer i.wg.Done()
-			result, err := cmd.Execute()
-			if err != nil {
-				return
-			}
-
-			i.mu.Lock()
-			defer i.mu.Unlock()
-			serviceName, Host := ExecuteCheckArgs(cmd)
-			i.CheckResult[Host] = append(i.CheckResult[Host], ExecuteCheckResult{
-				ServiceName: serviceName,
-				Result:      result,
-			})
-		}(cmd)
-	}
-	i.wg.Wait()
-}
-
 func (i *Invoker) ExecuteCommand() {
 	for _, cmd := range i.Commands {
 		i.wg.Add(1)
@@ -356,13 +336,6 @@ func (i *Invoker) CopyFiles() {
 	i.wg.Wait()
 }
 
-func ExecuteCheckArgs(cmd Command) (serviceName, Host string) {
-	if checkCmd, ok := cmd.(*SSHCommand); ok {
-		return checkCmd.ServiceInfo.ServiceName, checkCmd.ServiceInfo.Host
-	}
-	return "unknown", "unknown"
-}
-
 func ExecuteArgs(cmd Command) (command, host string) {
 	if executeCmd, ok := cmd.(*SSHCommand); ok {
 		return executeCmd.ServiceInfo.Command, executeCmd.ServiceInfo.Host
@@ -386,23 +359,11 @@ type CommandFactory struct {
 	SSHConfig SSHConfig
 }
 
-func (cf *CommandFactory) CreateCheckCommand(serviceName, command string) Command {
-	return &SSHCommand{
-		ServiceInfo: ServiceInfo{
-			ServiceName: serviceName,
-			Command:     command,
-			Host:        cf.SSHConfig.Host,
-		},
-		Config: cf.SSHConfig,
-	}
-}
-
 func (cf *CommandFactory) CreateExecuteCommand(command string) Command {
 	return &SSHCommand{
 		ServiceInfo: ServiceInfo{
-			ServiceName: "",
-			Command:     command,
-			Host:        cf.SSHConfig.Host,
+			Command: command,
+			Host:    cf.SSHConfig.Host,
 		},
 		Config: cf.SSHConfig,
 	}
@@ -454,12 +415,11 @@ func (cf *CommandFactory) CreateSCPCommand(localPath, remotePath string, upload 
 //	//invoker.AddCommand(HostTwo.CreateCheckCommand("upgrade", "systemctl is-active upgrade"))
 //	//invoker.AddCommand(HostTwo.CreateCheckCommand("license", "systemctl is-active license"))
 //	//invoker.AddCommand(HostTwo.CreateCheckCommand("platform", "systemctl is-active platform"))
-//	invoker.AddCommand(HostOne.CreateExecuteCommand("ls /tmp"))
+//	invoker.AddCommand(HostOne.CreateExecuteCommand("ls /tmp && "))
 //
 //	invoker.ExecuteCheckCommand()
 //	invoker.ExecuteCommand()
-//	invoker.CopyFiles()
-//
+//	invoker.CopyFiles()//
 //	fmt.Println()
 //	for k, v := range invoker.CheckResult {
 //		fmt.Printf("Host: %s, Results:\n", k)
