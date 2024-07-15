@@ -26,6 +26,13 @@ type Git struct {
 	Repository *git.Repository
 }
 
+// NewGit
+//
+//	@Description: 使用的是内存临时存储
+//	@param sshURLOrHTTPURL
+//	@param ref
+//	@return *Git
+//	@return error
 func NewGit(sshURLOrHTTPURL, ref string) (*Git, error) {
 	sshURL := sshURLOrHTTPURL
 	if parse, err := url.Parse(sshURLOrHTTPURL); err == nil {
@@ -71,6 +78,28 @@ func NewGitInit(sshURLOrHTTPURL, ref string) (*Git, error) {
 		return nil, err
 	}
 	return g, nil
+}
+
+// PlainClone
+//
+//	@Description:
+//	@receiver g
+//	@param path clone到指定的路径
+//	@param depth
+//	@return error
+func (g *Git) PlainClone(path string, depth int) error {
+	repository, err := git.PlainClone(path, false, &git.CloneOptions{
+		InsecureSkipTLS: true,
+		URL:             g.sshURL,
+		ReferenceName:   plumbing.ReferenceName(g.ref),
+		Auth:            g.publicKeys,
+		Depth:           depth,
+	})
+	if err != nil {
+		return fmt.Errorf("git clone error: %w", err)
+	}
+	g.Repository = repository
+	return nil
 }
 
 // Clone
