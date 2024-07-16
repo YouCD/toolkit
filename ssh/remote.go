@@ -14,7 +14,11 @@ import (
 
 type Command interface {
 	Execute() (string, error)
-	Copy() (string, error)
+}
+
+type Copy interface {
+	DownloadFiles() (string, error)
+	UploadFiles() (string, error)
 }
 
 type SSHConfig struct {
@@ -36,13 +40,7 @@ type ExecuteResult struct {
 	Result  string
 }
 
-type ExecuteCheckResult struct {
-	ServiceName string
-	Result      string
-}
-
 type CopyResult struct {
-	Host       string
 	RemoteHost string
 	RemotePath string
 	LocalPath  string
@@ -110,15 +108,10 @@ func (s *SSHCommand) Execute() (string, error) {
 	return string(output), nil
 }
 
-func (s *SSHCommand) Copy() (string, error) {
-	return "", fmt.Errorf("SSHCommand does not implement Copy")
-}
-
 type SCPCommand struct {
 	Config     SSHConfig
 	LocalPath  string
 	RemotePath string
-	Upload     bool // 上传为 true, 下载为 false
 }
 
 func (s *SCPCommand) SSHClient() (*ssh.Client, error) {
@@ -154,11 +147,7 @@ func (s *SCPCommand) SSHClient() (*ssh.Client, error) {
 	return client, nil
 }
 
-func (s *SCPCommand) Execute() (string, error) {
-	return "", fmt.Errorf("SCPCommand does not implement Execute")
-}
-
-func (s *SCPCommand) Copy() (string, error) {
+func (s *SCPCommand) DownloadFiles() (string, error) {
 	client, err := s.SSHClient()
 	if err != nil {
 		return "", err
@@ -171,19 +160,32 @@ func (s *SCPCommand) Copy() (string, error) {
 	}
 	defer sftpClient.Close()
 
-	if s.Upload {
-		err = s.upload(sftpClient)
-		if err != nil {
-			return "", err
-		}
-		return fmt.Sprintf("SFTP upload to %s successful", s.Config.Host), nil
-	} else {
-		err = s.download(sftpClient)
-		if err != nil {
-			return "", err
-		}
-		return fmt.Sprintf("SFTP download from %s successful", s.Config.Host), nil
+	err = s.download(sftpClient)
+	if err != nil {
+		return "", err
 	}
+	return fmt.Sprintf("SFTP download from %s successful", s.Config.Host), nil
+}
+
+func (s *SCPCommand) UploadFiles() (string, error) {
+	client, err := s.SSHClient()
+	if err != nil {
+		return "", err
+	}
+	defer client.Close()
+
+	sftpClient, err := sftp.NewClient(client)
+	if err != nil {
+		return "", err
+	}
+	defer sftpClient.Close()
+
+	err = s.upload(sftpClient)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("SFTP upload to %s successful", s.Config.Host), nil
+
 }
 
 func (s *SCPCommand) upload(sftpClient *sftp.Client) error {
@@ -264,16 +266,20 @@ func (s *SCPCommand) download(sftpClient *sftp.Client) error {
 }
 
 type Invoker struct {
-	Commands    []Command
-	CheckResult map[string][]ExecuteCheckResult
-	Result      ExecuteResult
-	CopyResult  CopyResult
-	mu          sync.Mutex
-	wg          sync.WaitGroup
+	Commands   []Command
+	Copy       []Copy
+	Result     ExecuteResult
+	CopyResult CopyResult
+	mu         sync.Mutex
+	wg         sync.WaitGroup
 }
 
 func (i *Invoker) AddCommand(cmd Command) {
 	i.Commands = append(i.Commands, cmd)
+}
+
+func (i *Invoker) AddCopyCommand(copy Copy) {
+	i.Copy = append(i.Copy, copy)
 }
 
 func (i *Invoker) ExecuteCommand() {
@@ -283,20 +289,18 @@ func (i *Invoker) ExecuteCommand() {
 			defer i.wg.Done()
 			result, err := cmd.Execute()
 			if err != nil {
-				command, host := ExecuteArgs(cmd)
 				i.Result = ExecuteResult{
-					Host:    host,
-					Command: command,
-					Result:  fmt.Sprintf("Failed: %v", err.Error()),
+					Host:    cmd.(*SSHCommand).ServiceInfo.Host,
+					Command: cmd.(*SSHCommand).ServiceInfo.Command,
+					Result:  err.Error(),
 				}
 			}
 
 			i.mu.Lock()
 			defer i.mu.Unlock()
-			command, host := ExecuteArgs(cmd)
 			i.Result = ExecuteResult{
-				Host:    host,
-				Command: command,
+				Host:    cmd.(*SSHCommand).ServiceInfo.Host,
+				Command: cmd.(*SSHCommand).ServiceInfo.Command,
 				Result:  result,
 			}
 		}(cmd)
@@ -304,31 +308,27 @@ func (i *Invoker) ExecuteCommand() {
 	i.wg.Wait()
 }
 
-func (i *Invoker) CopyFiles() {
-	for _, cmd := range i.Commands {
+func (i *Invoker) ScpDownloadFiles() {
+	for _, cmd := range i.Copy {
 		i.wg.Add(1)
-		go func(cmd Command) {
+		go func(cmd Copy) {
 			defer i.wg.Done()
-			result, err := cmd.Copy()
+			result, err := cmd.DownloadFiles()
 			if err != nil {
-				args := CopyArgs(cmd)
 				i.CopyResult = CopyResult{
-					Host:       args.Host,
-					RemoteHost: args.RemoteHost,
-					RemotePath: args.RemotePath,
-					LocalPath:  args.LocalPath,
-					Result:     fmt.Sprintf("Scp failed: %s", err.Error()),
+					RemoteHost: cmd.(*SCPCommand).Config.Host,
+					RemotePath: cmd.(*SCPCommand).RemotePath,
+					LocalPath:  cmd.(*SCPCommand).LocalPath,
+					Result:     err.Error(),
 				}
 			}
 
 			i.mu.Lock()
 			defer i.mu.Unlock()
-			args := CopyArgs(cmd)
 			i.CopyResult = CopyResult{
-				Host:       args.Host,
-				RemoteHost: args.RemoteHost,
-				RemotePath: args.RemotePath,
-				LocalPath:  args.LocalPath,
+				RemoteHost: cmd.(*SCPCommand).Config.Host,
+				RemotePath: cmd.(*SCPCommand).RemotePath,
+				LocalPath:  cmd.(*SCPCommand).LocalPath,
 				Result:     result,
 			}
 		}(cmd)
@@ -336,27 +336,47 @@ func (i *Invoker) CopyFiles() {
 	i.wg.Wait()
 }
 
-func ExecuteArgs(cmd Command) (command, host string) {
-	if executeCmd, ok := cmd.(*SSHCommand); ok {
-		return executeCmd.ServiceInfo.Command, executeCmd.ServiceInfo.Host
-	}
-	return "unknown", "unknown"
-}
+func (i *Invoker) ScpUploadFiles() {
+	for _, cmd := range i.Copy {
+		i.wg.Add(1)
+		go func(cmd Copy) {
+			defer i.wg.Done()
+			result, err := cmd.UploadFiles()
+			if err != nil {
+				i.CopyResult = CopyResult{
+					RemoteHost: cmd.(*SCPCommand).Config.Host,
+					RemotePath: cmd.(*SCPCommand).RemotePath,
+					LocalPath:  cmd.(*SCPCommand).LocalPath,
+					Result:     err.Error(),
+				}
+			}
 
-func CopyArgs(cmd Command) CopyResult {
-	if copyCmd, ok := cmd.(*SCPCommand); ok {
-		return CopyResult{
-			Host:       copyCmd.Config.Host,
-			RemoteHost: copyCmd.RemotePath,
-			RemotePath: copyCmd.RemotePath,
-			LocalPath:  copyCmd.LocalPath,
-		}
+			i.mu.Lock()
+			defer i.mu.Unlock()
+			i.CopyResult = CopyResult{
+				RemoteHost: cmd.(*SCPCommand).Config.Host,
+				RemotePath: cmd.(*SCPCommand).RemotePath,
+				LocalPath:  cmd.(*SCPCommand).LocalPath,
+				Result:     result,
+			}
+		}(cmd)
 	}
-	return CopyResult{}
+	i.wg.Wait()
 }
 
 type CommandFactory struct {
 	SSHConfig SSHConfig
+}
+
+// InitTask
+//
+//	@Description:
+//	@param SSHConfig
+//	@return CommandFactory 命令工厂
+//	@return *Invoker 调用者
+func InitTask(SSHConfig SSHConfig) (CommandFactory, *Invoker) {
+	remoteHost := CommandFactory{SSHConfig: SSHConfig}
+	return remoteHost, &Invoker{}
 }
 
 func (cf *CommandFactory) CreateExecuteCommand(command string) Command {
@@ -369,73 +389,18 @@ func (cf *CommandFactory) CreateExecuteCommand(command string) Command {
 	}
 }
 
-func (cf *CommandFactory) CreateSCPCommand(localPath, remotePath string, upload bool) Command {
+func (cf *CommandFactory) CreateDownloadCommand(localPath, remotePath string) Copy {
 	return &SCPCommand{
 		Config:     cf.SSHConfig,
 		LocalPath:  localPath,
 		RemotePath: remotePath,
-		Upload:     upload,
 	}
 }
 
-// 使用demo
-//func main() {
-//	sshConfig1 := SSHConfig{
-//		Host: "192.168.111.232",
-//		User: "root",
-//		//PrivateKeyPath: "/root/.ssh/id_rsa",
-//		Password: "123457.ii",
-//	}
-//
-//	HostOne := CommandFactory{SSHConfig: sshConfig1}
-//	//HostTwo := CommandFactory{SSHConfig: sshConfig2}
-//
-//	invoker := &Invoker{}
-//
-//	filesToUpload := map[string]string{
-//		"/root/proxy.sh": "/root/proxy.sh",
-//	}
-//
-//	filesToDownload := map[string]string{
-//		"/root/config": "/root/config",
-//	}
-//
-//	for local, remote := range filesToUpload {
-//		invoker.AddCommand(HostOne.CreateSCPCommand(local, remote, true))
-//	}
-//
-//	for remote, local := range filesToDownload {
-//		invoker.AddCommand(HostOne.CreateSCPCommand(local, remote, false))
-//	}
-//
-//	invoker.AddCommand(HostOne.CreateCheckCommand("upgrade", "systemctl is-active upgrade"))
-//	invoker.AddCommand(HostOne.CreateCheckCommand("license", "systemctl is-active license"))
-//	invoker.AddCommand(HostOne.CreateCheckCommand("platform", "systemctl is-active platform"))
-//
-//	//invoker.AddCommand(HostTwo.CreateCheckCommand("upgrade", "systemctl is-active upgrade"))
-//	//invoker.AddCommand(HostTwo.CreateCheckCommand("license", "systemctl is-active license"))
-//	//invoker.AddCommand(HostTwo.CreateCheckCommand("platform", "systemctl is-active platform"))
-//	invoker.AddCommand(HostOne.CreateExecuteCommand("ls /tmp && "))
-//
-//	invoker.ExecuteCheckCommand()
-//	invoker.ExecuteCommand()
-//	invoker.CopyFiles()//
-//	fmt.Println()
-//	for k, v := range invoker.CheckResult {
-//		fmt.Printf("Host: %s, Results:\n", k)
-//		for _, result := range v {
-//			fmt.Printf("  Service: %s, Result: %s\n", result.ServiceName, result.Result)
-//		}
-//	}
-//
-//	fmt.Printf("Host: %s, Command: %s, Result: %s\n", invoker.Result.Host, invoker.Result.Command, invoker.Result.Result)
-//	fmt.Println()
-//	fmt.Printf("localhost: %s\n,remotehost: %s\n,localPath: %s\n,remotePath: %s\n, result: %s\n",
-//		invoker.CopyResult.Host,
-//		invoker.CopyResult.RemoteHost,
-//		invoker.CopyResult.LocalPath,
-//		invoker.CopyResult.RemotePath,
-//		invoker.CopyResult.Result,
-//	)
-//
-//}
+func (cf *CommandFactory) CreateUploadCommand(localPath, remotePath string) Copy {
+	return &SCPCommand{
+		Config:     cf.SSHConfig,
+		LocalPath:  localPath,
+		RemotePath: remotePath,
+	}
+}
