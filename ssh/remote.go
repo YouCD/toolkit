@@ -34,17 +34,22 @@ type ServiceInfo struct {
 	Command string
 }
 
+type Message struct {
+	result string
+	err    error
+}
+
 type ExecuteResult struct {
 	Host    string
 	Command string
-	Result  string
+	Message Message
 }
 
 type CopyResult struct {
 	RemoteHost string
 	RemotePath string
 	LocalPath  string
-	Result     string
+	Message    Message
 }
 
 type SSHCommand struct {
@@ -202,10 +207,15 @@ func (s *SCPCommand) upload(sftpClient *sftp.Client) error {
 		remotePath := filepath.Join(s.RemotePath, relPath)
 
 		if info.IsDir() {
-			if err := sftpClient.MkdirAll(remotePath); err != nil {
+			if err := sftpClient.MkdirAll(filepath.Dir(remotePath)); err != nil {
 				return err
 			}
 		} else {
+
+			if err := sftpClient.MkdirAll(filepath.Dir(remotePath)); err != nil {
+				return err
+			}
+
 			localFile, err := os.Open(path)
 			if err != nil {
 				return err
@@ -219,6 +229,9 @@ func (s *SCPCommand) upload(sftpClient *sftp.Client) error {
 			defer remoteFile.Close()
 
 			if _, err := io.Copy(remoteFile, localFile); err != nil {
+				return err
+			}
+			if err := sftpClient.Chmod(remotePath, info.Mode()); err != nil {
 				return err
 			}
 		}
@@ -241,10 +254,14 @@ func (s *SCPCommand) download(sftpClient *sftp.Client) error {
 		localPath := filepath.Join(s.LocalPath, relPath)
 
 		if walker.Stat().IsDir() {
-			if err := os.MkdirAll(localPath, os.ModePerm); err != nil {
+			if err := os.MkdirAll(filepath.Dir(localPath), os.ModePerm); err != nil {
 				return err
 			}
 		} else {
+			if err := os.MkdirAll(filepath.Dir(localPath), os.ModePerm); err != nil {
+				return err
+			}
+
 			localFile, err := os.Create(localPath)
 			if err != nil {
 				return err
@@ -258,6 +275,10 @@ func (s *SCPCommand) download(sftpClient *sftp.Client) error {
 			defer remoteFile.Close()
 
 			if _, err := io.Copy(localFile, remoteFile); err != nil {
+				return err
+			}
+
+			if err := os.Chmod(localPath, walker.Stat().Mode()); err != nil {
 				return err
 			}
 		}
@@ -292,7 +313,10 @@ func (i *Invoker) ExecuteCommand() {
 				i.Result = ExecuteResult{
 					Host:    cmd.(*SSHCommand).ServiceInfo.Host,
 					Command: cmd.(*SSHCommand).ServiceInfo.Command,
-					Result:  err.Error(),
+					Message: Message{
+						result: "",
+						err:    err,
+					},
 				}
 			}
 
@@ -301,7 +325,10 @@ func (i *Invoker) ExecuteCommand() {
 			i.Result = ExecuteResult{
 				Host:    cmd.(*SSHCommand).ServiceInfo.Host,
 				Command: cmd.(*SSHCommand).ServiceInfo.Command,
-				Result:  result,
+				Message: Message{
+					result: result,
+					err:    nil,
+				},
 			}
 		}(cmd)
 	}
@@ -319,7 +346,10 @@ func (i *Invoker) ScpDownloadFiles() {
 					RemoteHost: cmd.(*SCPCommand).Config.Host,
 					RemotePath: cmd.(*SCPCommand).RemotePath,
 					LocalPath:  cmd.(*SCPCommand).LocalPath,
-					Result:     err.Error(),
+					Message: Message{
+						result: "",
+						err:    err,
+					},
 				}
 			}
 
@@ -329,7 +359,10 @@ func (i *Invoker) ScpDownloadFiles() {
 				RemoteHost: cmd.(*SCPCommand).Config.Host,
 				RemotePath: cmd.(*SCPCommand).RemotePath,
 				LocalPath:  cmd.(*SCPCommand).LocalPath,
-				Result:     result,
+				Message: Message{
+					result: result,
+					err:    nil,
+				},
 			}
 		}(cmd)
 	}
@@ -347,7 +380,10 @@ func (i *Invoker) ScpUploadFiles() {
 					RemoteHost: cmd.(*SCPCommand).Config.Host,
 					RemotePath: cmd.(*SCPCommand).RemotePath,
 					LocalPath:  cmd.(*SCPCommand).LocalPath,
-					Result:     err.Error(),
+					Message: Message{
+						result: "",
+						err:    err,
+					},
 				}
 			}
 
@@ -357,7 +393,10 @@ func (i *Invoker) ScpUploadFiles() {
 				RemoteHost: cmd.(*SCPCommand).Config.Host,
 				RemotePath: cmd.(*SCPCommand).RemotePath,
 				LocalPath:  cmd.(*SCPCommand).LocalPath,
-				Result:     result,
+				Message: Message{
+					result: result,
+					err:    nil,
+				},
 			}
 		}(cmd)
 	}
