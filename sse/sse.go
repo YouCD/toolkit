@@ -34,9 +34,8 @@ func Sse(msg chan string, uri string, l net.Listener) {
 			es.SendEventMessage(s, "", strconv.Itoa(id))
 		}
 	}()
-
-	err := http.Serve(l, nil)
-	if err != nil {
+	//nolint:gosec
+	if err := http.Serve(l, nil); err != nil {
 		panic(err)
 	}
 }
