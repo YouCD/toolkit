@@ -1,6 +1,7 @@
 package log
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -70,6 +71,16 @@ func Init(stdout bool) {
 	logger = l.Sugar()
 	setLogLevel()
 }
+func InitBuffer(logBuffer *bytes.Buffer) {
+	core := zapcore.NewCore(
+		zapcore.NewConsoleEncoder(newEncoderConfig()),
+		zapcore.NewMultiWriteSyncer(zapcore.AddSync(logBuffer), zapcore.AddSync(os.Stdout)), // 打印到控制台和文件
+		atomicLevel, // 日志级别
+	)
+	l := zap.New(core, zap.AddCaller(), zap.AddCallerSkip(1), zap.Development())
+	logger = l.Sugar()
+	setLogLevel()
+}
 
 func InitLogBoth() {
 	core := newCore(true, true)
@@ -79,23 +90,6 @@ func InitLogBoth() {
 }
 
 func newCore(stdout bool, both bool) zapcore.Core {
-	encoderConfig := zapcore.EncoderConfig{
-		TimeKey:       "ts",
-		LevelKey:      "level",
-		NameKey:       "logger",
-		CallerKey:     "caller",
-		MessageKey:    "msg",
-		StacktraceKey: "stacktrace",
-		EncodeLevel:   zapcore.CapitalColorLevelEncoder, // 这里可以指定颜色
-		LineEnding:    zapcore.DefaultLineEnding,
-		// EncodeLevel:    zapcore.LowercaseLevelEncoder,  // 小写编码器
-		EncodeTime:     zapcore.TimeEncoderOfLayout(logTmFmt), // ISO8601 UTC 时间格式
-		EncodeDuration: zapcore.SecondsDurationEncoder,        //
-		EncodeCaller:   zapcore.ShortCallerEncoder,            // 短路径编码器
-		// EncodeCaller:   zapcore.FullCallerEncoder,    // 全路径编码器
-		EncodeName: zapcore.FullNameEncoder,
-	}
-
 	// 设置级别
 	atomicLevel.SetLevel(logLevel)
 
@@ -124,11 +118,31 @@ func newCore(stdout bool, both bool) zapcore.Core {
 	}
 
 	return zapcore.NewCore(
-		zapcore.NewConsoleEncoder(encoderConfig),
+		zapcore.NewConsoleEncoder(newEncoderConfig()),
 		//		zapcore.NewJSONEncoder(encoderConfig), // 编码器配置
 		zapcore.NewMultiWriteSyncer(wsList...), // 打印到控制台和文件
 		atomicLevel,                            // 日志级别
 	)
+}
+
+func newEncoderConfig() zapcore.EncoderConfig {
+	encoderConfig := zapcore.EncoderConfig{
+		TimeKey:       "ts",
+		LevelKey:      "level",
+		NameKey:       "logger",
+		CallerKey:     "caller",
+		MessageKey:    "msg",
+		StacktraceKey: "stacktrace",
+		EncodeLevel:   zapcore.CapitalColorLevelEncoder, // 这里可以指定颜色
+		LineEnding:    zapcore.DefaultLineEnding,
+		// EncodeLevel:    zapcore.LowercaseLevelEncoder,  // 小写编码器
+		EncodeTime:     zapcore.TimeEncoderOfLayout(logTmFmt), // ISO8601 UTC 时间格式
+		EncodeDuration: zapcore.SecondsDurationEncoder,        //
+		EncodeCaller:   zapcore.ShortCallerEncoder,            // 短路径编码器
+		// EncodeCaller:   zapcore.FullCallerEncoder,    // 全路径编码器
+		EncodeName: zapcore.FullNameEncoder,
+	}
+	return encoderConfig
 }
 
 func GetLogFile() string {
