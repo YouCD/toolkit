@@ -7,13 +7,16 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/r3labs/sse/v2"
 	toolkitNet "gitlab.firecloud.wan/devops/ops-toolkit/net"
-	"gopkg.in/antage/eventsource.v1"
 )
 
-func Sse(msg chan string, uri string, l net.Listener) {
-	es := eventsource.New(nil, nil)
-	defer es.Close()
+func Sse(msg chan string, uri, streamID string, l net.Listener) {
+	server := sse.New()
+	server.CreateStream(streamID)
+	mux := http.NewServeMux()
+
+	defer server.Close()
 	switch {
 	case !strings.HasPrefix(uri, "/"):
 		uri = "/" + uri
@@ -23,7 +26,16 @@ func Sse(msg chan string, uri string, l net.Listener) {
 		uri = "/events"
 	}
 
-	http.Handle(uri, es)
+	mux.HandleFunc(uri, func(w http.ResponseWriter, r *http.Request) {
+		go func() {
+			<-r.Context().Done()
+			fmt.Println("The client is disconnected here")
+		}()
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
+		server.ServeHTTP(w, r)
+	})
+
 	go func() {
 		id := 1
 		for s := range msg {
@@ -31,20 +43,23 @@ func Sse(msg chan string, uri string, l net.Listener) {
 				continue
 			}
 			id++
-			es.SendEventMessage(s, "", strconv.Itoa(id))
+			server.Publish(streamID, &sse.Event{
+				Data: []byte(s),
+				ID:   []byte(strconv.Itoa(id)),
+			})
 		}
 	}()
 	//nolint:gosec
-	if err := http.Serve(l, nil); err != nil {
+	if err := http.Serve(l, mux); err != nil {
 		panic(err)
 	}
 }
-func NewNetListen() (net.Listener, string, int) {
+func NewNetListen(port int) (net.Listener, string, int) {
 	address, err := toolkitNet.PhysicsCNIAddress()
 	if err != nil {
 		panic(err)
 	}
-	l, err := net.Listen("tcp4", fmt.Sprintf("%s:0", address[0]))
+	l, err := net.Listen("tcp4", fmt.Sprintf("%s:%d", address[0], port))
 	if err != nil {
 		panic(err)
 	}
