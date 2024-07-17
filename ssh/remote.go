@@ -35,8 +35,8 @@ type ServiceInfo struct {
 }
 
 type Message struct {
-	result string
-	err    error
+	Result string
+	Error  error
 }
 
 type ExecuteResult struct {
@@ -314,8 +314,8 @@ func (i *Invoker) ExecuteCommand() {
 					Host:    cmd.(*SSHCommand).ServiceInfo.Host,
 					Command: cmd.(*SSHCommand).ServiceInfo.Command,
 					Message: Message{
-						result: "",
-						err:    err,
+						Result: "",
+						Error:  err,
 					},
 				}
 			}
@@ -326,8 +326,8 @@ func (i *Invoker) ExecuteCommand() {
 				Host:    cmd.(*SSHCommand).ServiceInfo.Host,
 				Command: cmd.(*SSHCommand).ServiceInfo.Command,
 				Message: Message{
-					result: result,
-					err:    nil,
+					Result: result,
+					Error:  nil,
 				},
 			}
 		}(cmd)
@@ -347,8 +347,8 @@ func (i *Invoker) ScpDownloadFiles() {
 					RemotePath: cmd.(*SCPCommand).RemotePath,
 					LocalPath:  cmd.(*SCPCommand).LocalPath,
 					Message: Message{
-						result: "",
-						err:    err,
+						Result: "",
+						Error:  err,
 					},
 				}
 			}
@@ -360,8 +360,8 @@ func (i *Invoker) ScpDownloadFiles() {
 				RemotePath: cmd.(*SCPCommand).RemotePath,
 				LocalPath:  cmd.(*SCPCommand).LocalPath,
 				Message: Message{
-					result: result,
-					err:    nil,
+					Result: result,
+					Error:  nil,
 				},
 			}
 		}(cmd)
@@ -381,8 +381,8 @@ func (i *Invoker) ScpUploadFiles() {
 					RemotePath: cmd.(*SCPCommand).RemotePath,
 					LocalPath:  cmd.(*SCPCommand).LocalPath,
 					Message: Message{
-						result: "",
-						err:    err,
+						Result: "",
+						Error:  err,
 					},
 				}
 			}
@@ -394,8 +394,8 @@ func (i *Invoker) ScpUploadFiles() {
 				RemotePath: cmd.(*SCPCommand).RemotePath,
 				LocalPath:  cmd.(*SCPCommand).LocalPath,
 				Message: Message{
-					result: result,
-					err:    nil,
+					Result: result,
+					Error:  nil,
 				},
 			}
 		}(cmd)
