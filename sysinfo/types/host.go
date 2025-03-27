@@ -79,6 +79,8 @@ func (h *Host) Platform() OSPlatform {
 		return OSPlatformOpensuseLeap
 	case "rocky":
 		return OSPlatformRocky
+	case "kylin":
+		return OSPlatformKylin
 	default:
 		return OSPlatformOther
 	}

@@ -192,7 +192,7 @@ func sudo(t *types.Host) error {
 //	@return error
 func selinux(h *types.Host) error {
 	switch h.Platform() {
-	case types.OSPlatformCentos, types.OSPlatformBigCloud, types.OSPlatformAnolis, types.OSPlatformOpeneuler, types.OSPlatformUOS, types.OSPlatformRocky:
+	case types.OSPlatformCentos, types.OSPlatformBigCloud, types.OSPlatformAnolis, types.OSPlatformOpeneuler, types.OSPlatformUOS, types.OSPlatformRocky, types.OSPlatformKylin:
 		getenforcePath := which.Which("getenforce")
 		if getenforcePath != "" {
 			selinuxResult, err := exec.Command("getenforce").Output()

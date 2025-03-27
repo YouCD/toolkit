@@ -11,6 +11,7 @@ const (
 	OSPlatformUOS          OSPlatform = "uos"
 	OSPlatformOpensuseLeap OSPlatform = "opensuse-leap"
 	OSPlatformRocky        OSPlatform = "rocky"
+	OSPlatformKylin        OSPlatform = "kylin"
 	OSPlatformOther        OSPlatform = "other"
 )
 
