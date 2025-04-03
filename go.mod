@@ -21,9 +21,11 @@ require (
 	github.com/hairyhenderson/go-which v0.2.0
 	github.com/klauspost/compress v1.17.8
 	github.com/minio/dperf v0.5.3
+	github.com/opencontainers/selinux v1.11.0
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/sftp v1.13.1
 	github.com/pterm/pterm v0.12.79
+	github.com/r3labs/sse/v2 v2.10.0
 	github.com/seancfoley/ipaddress-go v1.5.5
 	github.com/shirou/gopsutil/v3 v3.24.3
 	github.com/vishvananda/netlink v1.2.1-beta.2
@@ -172,7 +174,6 @@ require (
 	github.com/prometheus/common v0.44.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
 	github.com/r3labs/sse v0.0.0-20210224172625-26fe804710bc // indirect
-	github.com/r3labs/sse/v2 v2.10.0 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/seancfoley/bintree v1.2.3 // indirect
 	github.com/secure-io/sio-go v0.3.1 // indirect
@@ -237,7 +238,6 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231016165738-49dd2c1f3d0b // indirect
 	google.golang.org/grpc v1.59.0 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
-	gopkg.in/antage/eventsource.v1 v1.0.0-20150318155416-803f4c5af225 // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect

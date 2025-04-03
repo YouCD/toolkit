@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/opencontainers/selinux/go-selinux"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hairyhenderson/go-which"
 	"github.com/minio/dperf/pkg/dperf"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/disk"
@@ -93,8 +93,8 @@ func SysInfo(ctx context.Context, skipDiskPerformance bool, installDir string, s
 		h.HostInfo = info
 	}
 
-	// selinux
-	errs = append(errs, selinux(h))
+	// getSelinux
+	errs = append(errs, getSelinux(h))
 
 	//  获取主机时间
 	timeFetch(h)
@@ -185,28 +185,24 @@ func sudo(t *types.Host) error {
 	return nil
 }
 
-// selinux
+// getSelinux
 //
 //	@Description: selinux信息提取
 //	@param h
 //	@return error
-func selinux(h *types.Host) error {
-	switch h.Platform() {
-	case types.OSPlatformCentos, types.OSPlatformBigCloud, types.OSPlatformAnolis, types.OSPlatformOpeneuler, types.OSPlatformUOS, types.OSPlatformRocky, types.OSPlatformKylin:
-		getenforcePath := which.Which("getenforce")
-		if getenforcePath != "" {
-			selinuxResult, err := exec.Command("getenforce").Output()
-			if err != nil {
-				return fmt.Errorf("getenforce error: %w", err)
-			}
-			s := strings.Trim(string(selinuxResult), "\n")
-			h.Selinux = types.NewSelinux(s)
-			return nil
-		}
-		return ErrGetenforceNotExist
-	case types.OSPlatformUbuntu, types.OSPlatformOpensuseLeap:
-		h.Selinux = types.SelinuxDisabled
+func getSelinux(h *types.Host) error {
+	enabled := selinux.GetEnabled()
+	mode := selinux.EnforceMode()
+	if mode == 0 {
+		h.Selinux = types.SelinuxPermissive
+		return nil
 	}
+
+	if enabled {
+		h.Selinux = types.SelinuxEnforcing
+	}
+
+	h.Selinux = types.SelinuxDisabled
 	return nil
 }
 
