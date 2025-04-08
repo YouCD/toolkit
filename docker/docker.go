@@ -874,7 +874,16 @@ func (d *Docker) ContainerLogs(ctx context.Context, containerName string, option
 	for {
 		_, err = reader.Read(hdr)
 		if err != nil {
-			return fmt.Errorf("container logs,Read head error: %w", err)
+			if err == io.EOF {
+				// 如果是 follow 模式，可以继续等待
+				if defaultOptions.Follow {
+					time.Sleep(100 * time.Millisecond)
+					continue
+				}
+				// 否则正常退出
+				return nil
+			}
+			return fmt.Errorf("container logs, Read head error: %w", err)
 		}
 
 		var buffer bytes.Buffer
