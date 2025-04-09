@@ -346,34 +346,33 @@ func svcInComposeFile(ctx context.Context, file, service string) (*types2.Servic
 //	@param image
 //	@return error
 func (d *Docker) ContainerUpdateImage(ctx context.Context, containerName string, image string) error {
-	// 获取 container 配置
+	// 获取容器配置
 	inspectJSON, err := d.Inspect(ctx, containerName)
 	if err != nil {
 		return err
 	}
 
-	// 拉取镜像
+	// 拉取新镜像
 	if err = d.ImagePull(ctx, image, nil); err != nil {
 		return fmt.Errorf("ImagePull() error: %w", err)
 	}
 
-	// 移除旧容器
+	// 删除旧容器
 	if err = d.ContainerRemove(ctx, containerName); err != nil {
 		return err
 	}
 
-	// 更新容器配置
+	// 更新镜像字段
 	inspectJSON.Config.Image = image
 
-	// 复制原来的网络配置
+	// 构建新的网络配置：只保留网络名，不复制 IP/MAC
 	EndpointsConfig := make(map[string]*network.EndpointSettings)
-	for s, settings := range inspectJSON.NetworkSettings.Networks {
-		endpointSettings := settings.Copy()
-		EndpointsConfig[s] = endpointSettings
+	for netName := range inspectJSON.NetworkSettings.Networks {
+		EndpointsConfig[netName] = &network.EndpointSettings{}
 	}
 	networkingConfig := network.NetworkingConfig{EndpointsConfig: EndpointsConfig}
 
-	// 创建容器并启动
+	// 创建并启动容器
 	for {
 		resp, err := d.ContainerCreate(ctx, containerName, inspectJSON, networkingConfig)
 		if err != nil {
@@ -381,19 +380,14 @@ func (d *Docker) ContainerUpdateImage(ctx context.Context, containerName string,
 		}
 
 		if err := d.DockerCLIClient.Client().ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
-			//  有的容器没有运行用户
+			// 某些容器无用户配置
 			if strings.Contains(err.Error(), "no matching entries in passwd file") {
-				// 如果出现特定错误，移除容器并重置用户配置，然后再次尝试
-				if err = d.ContainerRemove(ctx, containerName); err != nil {
-					return err
-				}
+				_ = d.ContainerRemove(ctx, containerName)
 				inspectJSON.Config.User = ""
 				continue
 			}
 			return fmt.Errorf("ContainerStart() error: %w", err)
 		}
-
-		// 退出
 		break
 	}
 
