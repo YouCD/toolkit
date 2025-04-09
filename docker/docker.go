@@ -370,7 +370,7 @@ func (d *Docker) ContainerUpdateImage(ctx context.Context, containerName string,
 	for netName := range inspectJSON.NetworkSettings.Networks {
 		EndpointsConfig[netName] = &network.EndpointSettings{}
 	}
-	networkingConfig := network.NetworkingConfig{EndpointsConfig: EndpointsConfig}
+	networkingConfig := &network.NetworkingConfig{EndpointsConfig: EndpointsConfig}
 
 	// 创建并启动容器
 	for {
@@ -403,10 +403,10 @@ func (d *Docker) ContainerUpdateImage(ctx context.Context, containerName string,
 //	@param networkingConfig
 //	@return container.CreateResponse
 //	@return error
-func (d *Docker) ContainerCreate(ctx context.Context, containerName string, inspectJSON *types.ContainerJSON, networkingConfig network.NetworkingConfig) (container.CreateResponse, error) {
+func (d *Docker) ContainerCreate(ctx context.Context, containerName string, inspectJSON *types.ContainerJSON, networkingConfig *network.NetworkingConfig) (container.CreateResponse, error) {
 	resp, err := d.DockerCLIClient.Client().ContainerCreate(ctx,
 		inspectJSON.Config,
-		inspectJSON.HostConfig, &networkingConfig, nil, containerName)
+		inspectJSON.HostConfig, networkingConfig, nil, containerName)
 	if err != nil {
 		return container.CreateResponse{}, fmt.Errorf("ContainerCreatey() error: %w", err)
 	}
