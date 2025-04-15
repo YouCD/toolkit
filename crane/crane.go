@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"sync"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
@@ -151,6 +152,19 @@ const (
 	StateSuccess
 )
 
+func (s state) String() string {
+	switch s {
+	case StateStart:
+		return "Start"
+	case StateFail:
+		return "Fail"
+	case StateSuccess:
+		return "Success"
+	default:
+		return "Info"
+	}
+}
+
 type Msg struct {
 	ImageName string
 	State     state
@@ -170,58 +184,66 @@ func TarballFile2Daemon(tarballFilePath string, renameFunc renameFunc, msgChan c
 	if err != nil {
 		return fmt.Errorf("错误：无法从 tarball 文件中读取清单,err: %w", err)
 	}
+	var wg sync.WaitGroup
+
+	workChan := make(chan struct{}, 10)
+
 	for _, descriptor := range manifest {
 		if len(descriptor.RepoTags) == 0 {
 			continue
 		}
-		base := path.Base(descriptor.RepoTags[0])
-		//  将第一个 RepoTags 标签作为镜像的标签
-		oldRepoTag, err := name.NewTag(descriptor.RepoTags[0])
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-
-		newRef := oldRepoTag
-		//  newRef 名称
-		if renameFunc != nil {
-			newRef, err = name.NewTag(renameFunc(descriptor.RepoTags[0]))
+		wg.Add(1)
+		workChan <- struct{}{}
+		go func(tag string) {
+			defer func() {
+				<-workChan
+				wg.Done()
+			}()
+			base := path.Base(tag)
+			//  将第一个 RepoTags 标签作为镜像的标签
+			oldRepoTag, err := name.NewTag(tag)
 			if err != nil {
 				errs = append(errs, err)
-				continue
 			}
-		}
 
-		// 通过 从文件中读取指定tag镜像
-		img, err := tarball.ImageFromPath(tarballFilePath, &oldRepoTag)
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
+			newRef := oldRepoTag
+			//  newRef 名称
+			if renameFunc != nil {
+				newRef, err = name.NewTag(renameFunc(tag))
+				if err != nil {
+					errs = append(errs, err)
+				}
+			}
 
-		msgChan <- Msg{
-			ImageName: base,
-			State:     StateStart,
-			Err:       nil,
-		}
+			// 通过 从文件中读取指定tag镜像
+			img, err := tarball.ImageFromPath(tarballFilePath, &oldRepoTag)
+			if err != nil {
+				errs = append(errs, err)
+			}
 
-		_, err = daemon.Write(newRef, img)
-		if err != nil {
-			errs = append(errs, err)
 			msgChan <- Msg{
 				ImageName: base,
-				State:     StateFail,
-				Err:       err,
+				State:     StateStart,
+				Err:       nil,
 			}
-			continue
-		}
-		msgChan <- Msg{
-			ImageName: base,
-			State:     StateSuccess,
-			Err:       nil,
-		}
-	}
 
+			_, err = daemon.Write(newRef, img)
+			if err != nil {
+				errs = append(errs, err)
+				msgChan <- Msg{
+					ImageName: base,
+					State:     StateFail,
+					Err:       err,
+				}
+			}
+			msgChan <- Msg{
+				ImageName: base,
+				State:     StateSuccess,
+				Err:       nil,
+			}
+		}(descriptor.RepoTags[0])
+	}
+	wg.Wait()
 	return nil
 }
 

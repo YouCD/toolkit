@@ -2,8 +2,10 @@ package crane
 
 import (
 	"fmt"
+	"os"
 	"path"
 	"testing"
+	"time"
 )
 
 //
@@ -60,21 +62,25 @@ import (
 //}
 
 func TestPushTarImage(t *testing.T) {
-
+	now := time.Now()
 	msgChan := make(chan Msg)
 
 	go func() {
 		defer close(msgChan)
 		for msg := range msgChan {
-			fmt.Printf("iamge: %s ,状态: %d, err: %v\n", msg.ImageName, msg.State, msg.Err)
+			if msg.Err != nil {
+				fmt.Printf("iamge: %s ,状态: %s, err: %v\n", msg.ImageName, msg.State, msg.Err)
+			} else {
+				fmt.Printf("iamge: %s ,状态: %s\n", msg.ImageName, msg.State)
+			}
 		}
 	}()
 	rename := func(imageName string) string {
 		base := path.Base(imageName)
 		return base
 	}
-	if err := TarballFile2Daemon("/sscra/release/data/repo.tar", rename, msgChan); err != nil {
+	if err := TarballFile2Daemon(os.Args[1], rename, msgChan); err != nil {
 		t.Error(err)
 	}
-	t.Log("success")
+	fmt.Printf("此次Release耗时: %s\n", time.Since(now))
 }
