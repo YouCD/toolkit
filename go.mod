@@ -18,8 +18,8 @@ require (
 	github.com/go-git/go-billy/v5 v5.5.0
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/google/go-containerregistry v0.19.1
-	github.com/hairyhenderson/go-which v0.2.0
 	github.com/klauspost/compress v1.17.8
+	github.com/klauspost/cpuid/v2 v2.2.4
 	github.com/minio/dperf v0.5.3
 	github.com/opencontainers/selinux v1.11.0
 	github.com/pkg/errors v0.9.1
@@ -185,7 +185,6 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/skeema/knownhosts v1.2.2 // indirect
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966 // indirect
-	github.com/spf13/afero v1.9.5 // indirect
 	github.com/spf13/cobra v1.8.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/testify v1.9.0 // indirect

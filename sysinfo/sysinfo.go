@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	. "github.com/klauspost/cpuid/v2"
 	"github.com/minio/dperf/pkg/dperf"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/disk"
@@ -125,6 +126,7 @@ func SysInfo(ctx context.Context, skipDiskPerformance bool, installDir string, s
 	if len(errs) > 0 {
 		return h, errors.Join(errs...)
 	}
+	h.CPUInfo = CPU
 
 	return h, nil
 }

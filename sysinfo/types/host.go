@@ -1,6 +1,7 @@
 package types
 
 import (
+	"github.com/klauspost/cpuid/v2"
 	"strings"
 
 	"github.com/coreos/go-systemd/v22/dbus"
@@ -59,6 +60,7 @@ type Host struct {
 	CGroupVersion   CGroupVersion          `json:"cgroupVersion"`
 	DrivePerfResult *dperf.DrivePerfResult `json:"drivePerfResult"`
 	IPs             []string               `json:"IPs"` //nolint:tagliatelle
+	CPUInfo         cpuid.CPUInfo          `json:"CPUInfo"`
 }
 
 func (h *Host) Platform() OSPlatform {
