@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/opencontainers/selinux/go-selinux"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,8 +12,9 @@ import (
 	"sync"
 	"time"
 
-	. "github.com/klauspost/cpuid/v2"
+	"github.com/klauspost/cpuid/v2"
 	"github.com/minio/dperf/pkg/dperf"
+	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/disk"
 	"github.com/shirou/gopsutil/v3/host"
@@ -76,6 +76,8 @@ func SysInfo(ctx context.Context, skipDiskPerformance bool, installDir string, s
 	usage, err := disk.Usage(installDir)
 	if err == nil {
 		h.DataDiskFree = usage.Free
+	}
+	if err != nil {
 		errs = append(errs, err)
 	}
 	// 总内存
@@ -95,12 +97,16 @@ func SysInfo(ctx context.Context, skipDiskPerformance bool, installDir string, s
 	}
 
 	// getSelinux
-	errs = append(errs, getSelinux(h))
+	if err = getSelinux(h); err != nil {
+		errs = append(errs, err)
+	}
 
 	//  获取主机时间
 	timeFetch(h)
 
-	errs = append(errs, sudo(h))
+	if err = sudo(h); err != nil {
+		errs = append(errs, err)
+	}
 
 	//  CPU 配置
 	Count, err := cpu.Counts(true)
@@ -113,20 +119,25 @@ func SysInfo(ctx context.Context, skipDiskPerformance bool, installDir string, s
 	checkBPFfs(h)
 
 	// service 检查
-	errs = append(errs, service(ctx, h, services))
+	if err = service(ctx, h, services); err != nil {
+		errs = append(errs, err)
+	}
 
 	// CGroup版本
-	errs = append(errs, cGroupVersion(h))
+	if err = cGroupVersion(h); err != nil {
+		errs = append(errs, err)
+	}
 
 	// multiIP
 	multiIP(h)
+
+	h.CPUInfo = &cpuid.CPU
 
 	wg.Wait()
 
 	if len(errs) > 0 {
 		return h, errors.Join(errs...)
 	}
-	h.CPUInfo = CPU
 
 	return h, nil
 }
