@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.firecloud.wan/devops/ops-toolkit/log"
+	"github.com/youcd/toolkit/log"
 )
 
 func Test_sse(t *testing.T) {

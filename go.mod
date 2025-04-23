@@ -1,4 +1,4 @@
-module gitlab.firecloud.wan/devops/ops-toolkit
+module github.com/youcd/toolkit
 
 go 1.23.1
 

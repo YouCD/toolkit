@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/r3labs/sse/v2"
-	toolkitNet "gitlab.firecloud.wan/devops/ops-toolkit/net"
+	toolkitNet "github.com/youcd/toolkit/net"
 )
 
 func Sse(msg chan string, uri, streamID string, l net.Listener) {

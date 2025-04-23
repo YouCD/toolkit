@@ -7,7 +7,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"syscall"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/pkg/errors"
@@ -217,15 +216,18 @@ func CopyFolder(srcDir, dstDir string) error {
 	if err != nil {
 		return fmt.Errorf("获取源文件夹信息失败: %w", err)
 	}
-	var UID int
-	var GID int
-	if stat, ok := sourceInfo.Sys().(*syscall.Stat_t); ok {
-		UID = int(stat.Uid)
-		GID = int(stat.Gid)
-	} else {
-		UID = os.Getuid()
-		GID = os.Getgid()
-	}
+	//var UID int
+	//var GID int
+	//if stat, ok := sourceInfo.Sys().(*syscall.Stat_t); ok {
+	//	UID = int(stat.Uid)
+	//	GID = int(stat.Gid)
+	//} else {
+	//	UID = os.Getuid()
+	//	GID = os.Getgid()
+	//}
+
+	UID, GID := getFileUIDGID(sourceInfo)
+
 	// 创建目标文件夹
 	if err = os.MkdirAll(dstDir, sourceInfo.Mode()); err != nil {
 		return fmt.Errorf("创建目标文件夹失败: %w", err)

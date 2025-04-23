@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"time"
 
-	"gitlab.firecloud.wan/devops/ops-toolkit/file"
+	"github.com/youcd/toolkit/file"
 	"gopkg.in/yaml.v3"
 )
 

@@ -12,7 +12,7 @@ import (
 
 	"github.com/klauspost/compress/zstd"
 	"github.com/pkg/errors"
-	"gitlab.firecloud.wan/devops/ops-toolkit/file"
+	"github.com/youcd/toolkit/file"
 )
 
 type Progress struct {

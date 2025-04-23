@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/shirou/gopsutil/v3/host"
-	"gitlab.firecloud.wan/devops/ops-toolkit/sysinfo/types"
+	"github.com/youcd/toolkit/sysinfo/types"
 )
 
 var (

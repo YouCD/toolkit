@@ -19,9 +19,9 @@ import (
 	"github.com/shirou/gopsutil/v3/disk"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
-	"gitlab.firecloud.wan/devops/ops-toolkit/net"
-	"gitlab.firecloud.wan/devops/ops-toolkit/sysinfo/types"
-	"gitlab.firecloud.wan/devops/ops-toolkit/systemd"
+	"github.com/youcd/toolkit/net"
+	"github.com/youcd/toolkit/sysinfo/types"
+	"github.com/youcd/toolkit/systemd"
 	"go.uber.org/zap/buffer"
 	"golang.org/x/sys/unix"
 )
