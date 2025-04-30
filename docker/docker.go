@@ -99,7 +99,7 @@ type watchContainerCallback func(ctx context.Context, containerName string, rowD
 //	@receiver d
 //	@param watch
 func (d *Docker) WatchContainerCreate(ctx context.Context, action events.Action, watch watchContainerCallback) error {
-	evs, errs := d.DockerCLIClient.Client().Events(ctx, types.EventsOptions{
+	evs, errs := d.DockerCLIClient.Client().Events(ctx, events.ListOptions{
 		Filters: filters.NewArgs(filters.Arg("type", string(events.ContainerEventType))), // 搞一个事件过滤器
 	})
 
@@ -573,7 +573,7 @@ func (d *Docker) ImageLoadFromFile(ctx context.Context, imagePath string) error 
 //	@param input
 //	@return error
 func (d *Docker) imageLoadFromIOReader(ctx context.Context, input io.Reader) error {
-	if _, err := d.DockerCLIClient.Client().ImageLoad(ctx, input, true); err != nil {
+	if _, err := d.DockerCLIClient.Client().ImageLoad(ctx, input, client.ImageLoadWithQuiet(true)); err != nil {
 		return fmt.Errorf("加载镜像 error: %w", err)
 	}
 	return nil
@@ -644,7 +644,7 @@ func (d *Docker) matchAuthConfig(regImage string) (string, error) {
 //	@param ipCIDR
 //	@return error
 func (d *Docker) NetworkCreate(ctx context.Context, netName, ipCIDR string) error {
-	list, err := d.DockerCLIClient.Client().NetworkList(ctx, types.NetworkListOptions{Filters: filters.NewArgs(filters.KeyValuePair{Key: "name", Value: netName})})
+	list, err := d.DockerCLIClient.Client().NetworkList(ctx, network.ListOptions{Filters: filters.NewArgs(filters.KeyValuePair{Key: "name", Value: netName})})
 	if err != nil {
 		return fmt.Errorf("list net %s,err:%w", netName, err)
 	}
@@ -652,7 +652,7 @@ func (d *Docker) NetworkCreate(ctx context.Context, netName, ipCIDR string) erro
 		return ErrNetworkExist
 	}
 
-	options := types.NetworkCreate{
+	options := network.CreateOptions{
 		// CheckDuplicate: false,
 		Driver: "bridge",
 		IPAM: &network.IPAM{
@@ -682,8 +682,8 @@ func (d *Docker) NetworkCreate(ctx context.Context, netName, ipCIDR string) erro
 //	@param netName
 //	@return []types.NetworkResource
 //	@return error
-func (d *Docker) NetworkListByName(ctx context.Context, netName string) (*types.NetworkResource, error) {
-	list, err := d.DockerCLIClient.Client().NetworkList(ctx, types.NetworkListOptions{Filters: filters.NewArgs(filters.KeyValuePair{Key: "name", Value: netName})})
+func (d *Docker) NetworkListByName(ctx context.Context, netName string) (*network.Summary, error) {
+	list, err := d.DockerCLIClient.Client().NetworkList(ctx, network.ListOptions{Filters: filters.NewArgs(filters.KeyValuePair{Key: "name", Value: netName})})
 	if err != nil {
 		return nil, fmt.Errorf("list Network,err:%w", err)
 	}
@@ -711,7 +711,7 @@ func (d *Docker) ComposeServiceUp(ctx context.Context, p *types2.Project, recrea
 		},
 		Start: api.StartOptions{
 			Project:     p,
-			CascadeStop: false,
+			OnExit:      api.CascadeStop,
 			Wait:        true,
 			WaitTimeout: time.Second * 3000,
 		},
