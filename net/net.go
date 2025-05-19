@@ -39,13 +39,13 @@ func GetHostIPByIndex(cidr string, index int) net.IP {
 	return nil
 }
 
-// CIDR2IPorNetworkMask
+// CIDR2IPNetworkMask
 //
 //	@Description: 将CIDR转换成IP地址和掩码
 //	@param cidr
 //	@return string
 //	@return string
-func CIDR2IPorNetworkMask(cidr string) (string, string, error) {
+func CIDR2IPNetworkMask(cidr string) (string, string, error) {
 	ipAddrObjStr := ipaddr.NewIPAddressString(cidr)
 	if !ipAddrObjStr.IsValid() {
 		return "", "", fmt.Errorf("invalid cidr")
@@ -53,6 +53,27 @@ func CIDR2IPorNetworkMask(cidr string) (string, string, error) {
 
 	ipAddrObj := ipAddrObjStr.GetAddress()
 	return ipAddrObj.GetNetIPAddr().IP.String(), ipAddrObj.GetNetworkMask().String(), nil
+}
+
+//
+// CIDR2IPNet
+//  @Description: 将CIDR转换成 netIP
+//  @param cidr
+//  @return string
+//  @return error
+//
+func CIDR2IPNet(cidr string) (string, error) {
+	ipAddrObjStr := ipaddr.NewIPAddressString(cidr)
+	if !ipAddrObjStr.IsValid() {
+		return "", fmt.Errorf("invalid cidr")
+	}
+
+	ipAddrObj := ipAddrObjStr.GetAddress()
+	masked, err := ipAddrObj.Mask(ipAddrObj.GetNetworkMask())
+	if err != nil {
+		return "", fmt.Errorf("ipAddrObj.Mask() : %w", err)
+	}
+	return masked.String(), err
 }
 
 // PhysicsCNIAddress
