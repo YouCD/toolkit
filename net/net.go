@@ -45,9 +45,14 @@ func GetHostIPByIndex(cidr string, index int) net.IP {
 //	@param cidr
 //	@return string
 //	@return string
-func CIDR2IPorNetworkMask(cidr string) (string, string) {
-	ipAddrObj := ipaddr.NewIPAddressString(cidr).GetAddress()
-	return ipAddrObj.GetNetIPAddr().IP.String(), ipAddrObj.GetNetworkMask().String()
+func CIDR2IPorNetworkMask(cidr string) (string, string, error) {
+	ipAddrObjStr := ipaddr.NewIPAddressString(cidr)
+	if !ipAddrObjStr.IsValid() {
+		return "", "", fmt.Errorf("invalid cidr")
+	}
+
+	ipAddrObj := ipAddrObjStr.GetAddress()
+	return ipAddrObj.GetNetIPAddr().IP.String(), ipAddrObj.GetNetworkMask().String(), nil
 }
 
 // PhysicsCNIAddress
