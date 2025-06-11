@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/pkg/errors"
@@ -211,53 +212,59 @@ func Copy(src, dest string) error {
 //	@param destination
 //	@return error
 func CopyFolder(srcDir, dstDir string) error {
-	// 获取源文件夹信息
-	sourceInfo, err := os.Stat(srcDir)
+	absSrcDir, err := filepath.Abs(srcDir)
 	if err != nil {
-		return fmt.Errorf("获取源文件夹信息失败: %w", err)
+		return fmt.Errorf("获取源目录绝对路径失败: %w", err)
 	}
-	//var UID int
-	//var GID int
-	//if stat, ok := sourceInfo.Sys().(*syscall.Stat_t); ok {
-	//	UID = int(stat.Uid)
-	//	GID = int(stat.Gid)
-	//} else {
-	//	UID = os.Getuid()
-	//	GID = os.Getgid()
-	//}
+	absDstDir, err := filepath.Abs(dstDir)
+	if err != nil {
+		return fmt.Errorf("获取目标目录绝对路径失败: %w", err)
+	}
+
+	// 获取源目录信息
+	sourceInfo, err := os.Stat(absSrcDir)
+	if err != nil {
+		return fmt.Errorf("获取源目录信息失败: %w", err)
+	}
 
 	UID, GID := getFileUIDGID(sourceInfo)
 
-	// 创建目标文件夹
-	if err = os.MkdirAll(dstDir, sourceInfo.Mode()); err != nil {
+	// 创建目标目录
+	if err := os.MkdirAll(absDstDir, sourceInfo.Mode()); err != nil {
 		return fmt.Errorf("创建目标文件夹失败: %w", err)
 	}
-
-	//  设置目标文件夹的权限和源文件夹一致
-	if err = os.Chown(dstDir, UID, GID); err != nil {
+	if err := os.Chown(absDstDir, UID, GID); err != nil {
 		return fmt.Errorf("设置目标文件夹权限失败: %w", err)
 	}
 
-	// 遍历源文件夹中的文件和子文件夹
-	entries, err := os.ReadDir(srcDir)
+	// 遍历源目录内容
+	entries, err := os.ReadDir(absSrcDir)
 	if err != nil {
-		return fmt.Errorf("读取源文件夹信息失败: %w", err)
+		return fmt.Errorf("读取源目录内容失败: %w", err)
 	}
 	for _, entry := range entries {
-		sourcePath := filepath.Join(srcDir, entry.Name())
-		destinationPath := filepath.Join(dstDir, entry.Name())
+		sourcePath := filepath.Join(absSrcDir, entry.Name())
+		// 绝对路径用于判断是否是 dstDir 的子路径
+		absSourcePath, err := filepath.Abs(sourcePath)
+		if err != nil {
+			return fmt.Errorf("获取绝对路径失败: %w", err)
+		}
 
-		if entry.IsDir() {
-			// 递归拷贝子文件夹
-			if err = CopyFolder(sourcePath, destinationPath); err != nil {
-				return err
-			}
+		// 跳过任何目标目录及其子目录（避免递归拷贝生成的文件）
+		if strings.HasPrefix(absSourcePath, absDstDir+string(os.PathSeparator)) || absSourcePath == absDstDir {
 			continue
 		}
 
-		// 拷贝文件
-		if err = Copy(sourcePath, destinationPath); err != nil {
-			return err
+		destinationPath := filepath.Join(absDstDir, entry.Name())
+
+		if entry.IsDir() {
+			if err := CopyFolder(absSourcePath, destinationPath); err != nil {
+				return err
+			}
+		} else {
+			if err := Copy(absSourcePath, destinationPath); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -281,13 +288,47 @@ func MoveFile(sourcePath, destPath string) error {
 }
 
 func MoveDir(sourcePath, destPath string) error {
-	if err := CopyFolder(sourcePath, destPath); err != nil {
-		return fmt.Errorf("移动文件夹失败: %w", err)
+	err := os.Rename(sourcePath, destPath)
+	if err == nil {
+		return nil // 快速 rename 成功
 	}
-	err := os.RemoveAll(sourcePath)
+
+	absSource, err := filepath.Abs(sourcePath)
 	if err != nil {
-		return fmt.Errorf("删除源文件夹失败: %w", err)
+		return fmt.Errorf("获取源路径失败: %w", err)
 	}
+	absDest, err := filepath.Abs(destPath)
+	if err != nil {
+		return fmt.Errorf("获取目标路径失败: %w", err)
+	}
+
+	// Step 1: 拷贝（CopyFolder 已跳过 destPath）
+	if err := CopyFolder(absSource, absDest); err != nil {
+		return fmt.Errorf("拷贝失败: %w", err)
+	}
+
+	// Step 2: 遍历源目录并删除除目标目录以外的所有子项
+	entries, err := os.ReadDir(absSource)
+	if err != nil {
+		return fmt.Errorf("读取源目录失败: %w", err)
+	}
+	for _, entry := range entries {
+		entryPath := filepath.Join(absSource, entry.Name())
+		absEntryPath, err := filepath.Abs(entryPath)
+		if err != nil {
+			return fmt.Errorf("解析路径失败: %w", err)
+		}
+
+		// 跳过目标目录
+		if absEntryPath == absDest || strings.HasPrefix(absEntryPath, absDest+string(os.PathSeparator)) {
+			continue
+		}
+
+		if err := os.RemoveAll(absEntryPath); err != nil {
+			return fmt.Errorf("删除文件失败: %w", err)
+		}
+	}
+
 	return nil
 }
 
