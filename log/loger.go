@@ -2,15 +2,18 @@ package log
 
 import (
 	"bytes"
-	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
-	"time"
 
+	"github.com/natefinch/lumberjack"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
+
+type Config struct {
+	LumberjackCfg *lumberjack.Logger // 写到文件
+	Stdout        bool               // 打印到控制台
+}
 
 var (
 	logTmFmt    = "2006-01-02 15:04:05"
@@ -19,9 +22,12 @@ var (
 	logLevel    = zap.InfoLevel
 	LogLevel    = "debug"
 
-	// 打印到文件
-	format   = time.Now().Format("20060102")
-	fileName = fmt.Sprintf("install_%s.log", format)
+	defaultConfig = &Config{
+		Stdout: true,
+	}
+)
+var (
+	lumberjackLogger *lumberjack.Logger
 )
 
 func LoggerIsNil() bool {
@@ -35,14 +41,6 @@ func LoggerIsNil() bool {
 func SetLogLevel(level string) {
 	LogLevel = level
 	setLogLevel()
-}
-
-// SetFileName
-//
-//	@Description: 设置文件名
-//	@param file
-func SetFileName(file string) {
-	fileName = file
 }
 
 func setLogLevel() {
@@ -65,8 +63,11 @@ func setLogLevel() {
 	atomicLevel.SetLevel(logLevel)
 }
 
-func Init(stdout bool) {
-	core := newCore(stdout, false)
+func Init(cfg *Config) {
+	if cfg == nil {
+		cfg = defaultConfig
+	}
+	core := newCore(cfg)
 	l := zap.New(core, zap.AddCaller(), zap.AddCallerSkip(1), zap.Development())
 	logger = l.Sugar()
 	setLogLevel()
@@ -75,48 +76,33 @@ func InitBuffer(logBuffer *bytes.Buffer) {
 	core := zapcore.NewCore(
 		zapcore.NewConsoleEncoder(newEncoderConfig()),
 		zapcore.NewMultiWriteSyncer(zapcore.AddSync(logBuffer), zapcore.AddSync(os.Stdout)), // 打印到控制台和文件
-		atomicLevel, // 日志级别
+		atomicLevel,                                                                         // 日志级别
 	)
 	l := zap.New(core, zap.AddCaller(), zap.AddCallerSkip(1), zap.Development())
 	logger = l.Sugar()
 	setLogLevel()
 }
 
-func InitLogBoth() {
-	core := newCore(true, true)
-	l := zap.New(core, zap.AddCaller(), zap.AddCallerSkip(1), zap.Development())
-	logger = l.Sugar()
-	setLogLevel()
-}
-
-func newCore(stdout bool, both bool) zapcore.Core {
+func newCore(cfg *Config) zapcore.Core {
 	// 设置级别
 	atomicLevel.SetLevel(logLevel)
 
 	var wsList []zapcore.WriteSyncer
-	switch {
-	case both:
-		// 打印到控制台
+	if cfg.Stdout {
 		wsList = append(wsList, zapcore.AddSync(os.Stdout))
-		// 写到文件
-		f, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
-		if err != nil {
-			fmt.Println(err.Error())
-			os.Exit(1)
-		}
-		wsList = append(wsList, zapcore.AddSync(f))
-	case stdout && !both:
-		// 打印到控制台
-		wsList = append(wsList, zapcore.AddSync(os.Stdout))
-	default:
-		f, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
-		if err != nil {
-			fmt.Println(err.Error())
-			os.Exit(1)
-		}
-		wsList = append(wsList, zapcore.AddSync(f))
 	}
-
+	if cfg.LumberjackCfg != nil {
+		lumberjackLogger = &lumberjack.Logger{
+			Filename:   cfg.LumberjackCfg.Filename,   //日志文件存放目录，如果文件夹不存在会自动创建
+			MaxSize:    cfg.LumberjackCfg.MaxSize,    //文件大小限制,单位100MB
+			MaxBackups: cfg.LumberjackCfg.MaxBackups, //最大保留日志文件数量
+			MaxAge:     cfg.LumberjackCfg.MaxAge,     //日志文件保留天数
+			Compress:   cfg.LumberjackCfg.Compress,   //是否压缩处理
+			LocalTime:  cfg.LumberjackCfg.LocalTime,
+		}
+		infoFileWriteSyncer := zapcore.AddSync(lumberjackLogger)
+		wsList = append(wsList, zapcore.AddSync(infoFileWriteSyncer))
+	}
 	return zapcore.NewCore(
 		zapcore.NewConsoleEncoder(newEncoderConfig()),
 		//		zapcore.NewJSONEncoder(encoderConfig), // 编码器配置
@@ -146,8 +132,10 @@ func newEncoderConfig() zapcore.EncoderConfig {
 }
 
 func GetLogFile() string {
-	dir, _ := os.Getwd()
-	return filepath.Join(dir, fileName)
+	if lumberjackLogger != nil {
+		return lumberjackLogger.Filename
+	}
+	return "no file"
 }
 
 func Debug(args ...interface{}) {
