@@ -20,7 +20,7 @@ var (
 	logger      *zap.SugaredLogger
 	atomicLevel = zap.NewAtomicLevelAt(zap.DebugLevel)
 	logLevel    = zap.InfoLevel
-	LogLevel    = "debug"
+	initLevel   = "debug"
 
 	defaultConfig = &Config{
 		Stdout: true,
@@ -39,12 +39,12 @@ func LoggerIsNil() bool {
 //	@Description:默认级别是debug，实时修改日志级别
 //	@param level
 func SetLogLevel(level string) {
-	LogLevel = level
+	initLevel = level
 	setLogLevel()
 }
 
 func setLogLevel() {
-	switch strings.ToLower(LogLevel) {
+	switch strings.ToLower(initLevel) {
 	case "debug":
 		logLevel = zap.DebugLevel
 	case "info":

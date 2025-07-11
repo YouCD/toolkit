@@ -42,26 +42,26 @@ type CheckItem struct {
 }
 
 type Host struct {
-	IP              *IP                    `json:"ip"`
-	User            string                 `json:"user"`
-	Password        string                 `json:"password"`
-	Arch            string                 `json:"arch"`
-	MemorySize      uint64                 `json:"memorySize"` // Bytes
-	HostInfo        *host.InfoStat         `json:"hostInfo"`
-	DataDiskFree    uint64                 `json:"free"` // Bytes
-	Services        []*dbus.UnitStatus     `json:"services"`
-	Hostname        string                 `json:"hostname"`
-	Selinux         Selinux                `json:"selinux"`
-	OutputInterface string                 `json:"outputInterface"`
-	ResolvConfg     bool                   `json:"resolvConfg"`
-	CurentTime      int64                  `json:"currentTime"`
-	CPUCount        int                    `json:"cpuCount"`
-	Sudo            bool                   `json:"sudo"`
-	BPFFSCheck      bool                   `json:"bpffsCheck"`
-	CGroupVersion   CGroupVersion          `json:"cgroupVersion"`
-	DrivePerfResult *dperf.DrivePerfResult `json:"drivePerfResult"`
-	IPs             []string               `json:"IPs"` //nolint:tagliatelle
-	CPUInfo         *cpuid.CPUInfo         `json:"CPUInfo"`
+	IP              *IP                               `json:"ip"`
+	User            string                            `json:"user"`
+	Password        string                            `json:"password"`
+	Arch            string                            `json:"arch"`
+	MemorySize      uint64                            `json:"memorySize"` // Bytes
+	HostInfo        *host.InfoStat                    `json:"hostInfo"`
+	DataDiskFree    map[string]uint64                 `json:"free"` // Bytes
+	Services        []*dbus.UnitStatus                `json:"services"`
+	Hostname        string                            `json:"hostname"`
+	Selinux         Selinux                           `json:"selinux"`
+	OutputInterface string                            `json:"outputInterface"`
+	ResolvConfg     bool                              `json:"resolvConfg"`
+	CurentTime      int64                             `json:"currentTime"`
+	CPUCount        int                               `json:"cpuCount"`
+	Sudo            bool                              `json:"sudo"`
+	BPFFSCheck      bool                              `json:"bpffsCheck"`
+	CGroupVersion   CGroupVersion                     `json:"cgroupVersion"`
+	DrivePerfResult map[string]*dperf.DrivePerfResult `json:"drivePerfResult"`
+	IPs             []string                          `json:"IPs"` //nolint:tagliatelle
+	CPUInfo         *cpuid.CPUInfo                    `json:"CPUInfo"`
 }
 
 func (h *Host) Platform() OSPlatform {

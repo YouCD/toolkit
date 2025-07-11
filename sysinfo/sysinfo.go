@@ -39,7 +39,7 @@ var (
 	ErrGetenforceNotExist = errors.New("getenforce命令不存在")
 )
 
-func SysInfo(ctx context.Context, skipDiskPerformance bool, installDir string, services []string) (*types.Host, error) {
+func SysInfo(ctx context.Context, skipDiskPerformance bool, installDirs []string, services []string) (*types.Host, error) {
 	var errs []error
 	h := new(types.Host)
 
@@ -49,37 +49,41 @@ func SysInfo(ctx context.Context, skipDiskPerformance bool, installDir string, s
 		IPType:  0,
 	}
 	h.IP = IP
+	h.DataDiskFree = make(map[string]uint64)
 	// 磁盘使用情况
-	stat, err := os.Stat(installDir)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			if err = os.MkdirAll(installDir, 755); err != nil {
-				errs = append(errs, ErrMkDirInstallDir)
+	for _, dir := range installDirs {
+		stat, err := os.Stat(dir)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				if err = os.MkdirAll(dir, 755); err != nil {
+					errs = append(errs, ErrMkDirInstallDir)
+				}
+			} else {
+				errs = append(errs, err)
 			}
-		} else {
+		}
+
+		if stat != nil && !stat.IsDir() {
+			errs = append(errs, ErrInstallDirIsNotDir)
+		}
+		// 检查磁盘性能  diskPerformance
+		wg.Add(1)
+		go func(dir string) {
+			defer wg.Done()
+			if !skipDiskPerformance {
+				errs = append(errs, diskPerformance(ctx, h, dir))
+			}
+		}(dir)
+		// 检查磁盘空间
+		usage, err := disk.Usage(dir)
+		if err == nil {
+			h.DataDiskFree[dir] = usage.Free
+		}
+		if err != nil {
 			errs = append(errs, err)
 		}
 	}
 
-	if stat != nil && !stat.IsDir() {
-		errs = append(errs, ErrInstallDirIsNotDir)
-	}
-	// 检查磁盘性能  diskPerformance
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if !skipDiskPerformance {
-			errs = append(errs, diskPerformance(ctx, h, installDir))
-		}
-	}()
-
-	usage, err := disk.Usage(installDir)
-	if err == nil {
-		h.DataDiskFree = usage.Free
-	}
-	if err != nil {
-		errs = append(errs, err)
-	}
 	// 总内存
 	memory, err := mem.VirtualMemory()
 	if err == nil {
@@ -318,9 +322,9 @@ func Mode() CGMode {
 //	@Description: 检查此磁盘性能
 //	@param h
 func diskPerformance(ctx context.Context, h *types.Host, performanceDir string) error {
-	drivePerfResult := new(dperf.DrivePerfResult)
+	//drivePerfResult := new(dperf.DrivePerfResult)
 	// 默认值,防止空指针 panic
-	h.DrivePerfResult = drivePerfResult
+	h.DrivePerfResult = make(map[string]*dperf.DrivePerfResult)
 	perf := &dperf.DrivePerf{
 		Serial:     false,
 		BlockSize:  4194304,    // 4MiB
@@ -336,7 +340,7 @@ func diskPerformance(ctx context.Context, h *types.Host, performanceDir string) 
 		return ErrPerfResultIsNull
 	}
 	// 重新赋值
-	h.DrivePerfResult = results[0]
+	h.DrivePerfResult[performanceDir] = results[0]
 	return nil
 }
 

@@ -361,7 +361,7 @@ func RemoveAll(dir string) {
 
 // FromDataDir
 //
-//	@Description: 返回安装包中指 targetDir 目录中指定fileOrDir的绝对路径，例： 获取 release/data/a.tar 文件,或返回a.tar的绝对路径
+//	@Description: 返回安装包中 targetDir 目录中指定fileOrDir的绝对路径，例： 获取 release/data/a.tar 文件,或返回a.tar的绝对路径
 //	@param firOrDir
 //	@return absPath
 func FromDataDir(targetDir, fileOrDir string) string {

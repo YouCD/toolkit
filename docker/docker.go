@@ -35,6 +35,7 @@ import (
 	"github.com/docker/docker/registry"
 	"github.com/docker/go-connections/nat"
 	"github.com/duke-git/lancet/v2/slice"
+	"github.com/youcd/toolkit/net"
 )
 
 var (
@@ -659,7 +660,8 @@ func (d *Docker) NetworkCreate(ctx context.Context, netName, ipCIDR string) erro
 			Driver:  "default",
 			Options: nil,
 			Config: []network.IPAMConfig{{
-				Subnet: ipCIDR,
+				Subnet:  ipCIDR,
+				Gateway: net.GetHostIPByIndex(ipCIDR, 1).String(),
 			}},
 		},
 	}
