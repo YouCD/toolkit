@@ -101,9 +101,7 @@ func SysInfo(ctx context.Context, skipDiskPerformance bool, installDirs []string
 	}
 
 	// getSelinux
-	if err = getSelinux(h); err != nil {
-		errs = append(errs, err)
-	}
+	getSelinux(h)
 
 	//  获取主机时间
 	timeFetch(h)
@@ -207,20 +205,19 @@ func sudo(t *types.Host) error {
 //	@Description: selinux信息提取
 //	@param h
 //	@return error
-func getSelinux(h *types.Host) error {
+func getSelinux(h *types.Host) {
 	enabled := selinux.GetEnabled()
+	if enabled {
+		h.Selinux = types.SelinuxEnforcing
+		return
+	}
 	mode := selinux.EnforceMode()
 	if mode == 0 {
 		h.Selinux = types.SelinuxPermissive
-		return nil
+		return
 	}
-
-	if enabled {
-		h.Selinux = types.SelinuxEnforcing
-	}
-
 	h.Selinux = types.SelinuxDisabled
-	return nil
+	return
 }
 
 // timeFetch
