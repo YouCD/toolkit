@@ -74,12 +74,18 @@ func ExtractTarZstOrGzipFile(src, dest string, progressChan chan string) error {
 		case tar.TypeDir:
 			pg.DirCount++
 			pushMsg(pg, progressChan)
-			if err := os.MkdirAll(target, 0755); err != nil {
+			if err := os.MkdirAll(target,  os.FileMode(header.Mode)); err != nil {
 				return fmt.Errorf("创建文件夹失败: %s,err：%w", target, err)
+			}
+			// 强制设置权限（覆盖原有的）
+			err = os.Chmod(target, os.FileMode(header.Mode))
+			if err != nil {
+				return err
 			}
 			if err := os.Chown(target, header.Uid, header.Gid); err != nil {
 				return fmt.Errorf("修改文件所有者失败: %s,err：%w", target, err)
 			}
+
 		// 普通文件
 		case tar.TypeReg:
 			pg.FileCount++

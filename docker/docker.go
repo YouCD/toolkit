@@ -53,9 +53,10 @@ var (
 type Docker struct {
 	ComposeService  api.Service
 	DockerCLIClient command.Cli
+	EnvFiles        []string
 }
 
-func NewDocker(ctx context.Context) (*Docker, error) {
+func NewDocker(ctx context.Context, envFiles ...string) (*Docker, error) {
 	// 关闭进度条
 	progress.Mode = progress.ModeQuiet
 	// 创建docker client
@@ -83,6 +84,7 @@ func NewDocker(ctx context.Context) (*Docker, error) {
 	d = &Docker{
 		ComposeService:  service,
 		DockerCLIClient: dockerCli,
+		EnvFiles:        envFiles,
 	}
 	return d, nil
 }
@@ -313,7 +315,7 @@ func (d *Docker) FindSVCFromYamlFile(ctx context.Context, service, project strin
 	yamlFiles := strings.Split(stack.ConfigFiles, ",")
 	var yamlFile string
 	for _, file := range yamlFiles {
-		if _, ok, _ := svcInComposeFile(ctx, file, service); ok {
+		if _, ok, _ := d.svcInComposeFile(ctx, file, service); ok {
 			yamlFile = file
 		}
 	}
@@ -324,8 +326,8 @@ func (d *Docker) FindSVCFromYamlFile(ctx context.Context, service, project strin
 	return yamlFile, yamlFiles, nil
 }
 
-func svcInComposeFile(ctx context.Context, file, service string) (*types2.ServiceConfig, bool, error) {
-	projectObj, err := ComposeYamlRead(ctx, file)
+func (d *Docker) svcInComposeFile(ctx context.Context, file, service string, ) (*types2.ServiceConfig, bool, error) {
+	projectObj, err := ComposeYamlRead(ctx, file, d.EnvFiles...)
 	if err != nil {
 		return nil, false, err
 	}
@@ -346,16 +348,17 @@ func svcInComposeFile(ctx context.Context, file, service string) (*types2.Servic
 //	@param containerName
 //	@param image
 //	@return error
-func (d *Docker) ContainerUpdateImage(ctx context.Context, containerName string, image string) error {
+func (d *Docker) ContainerUpdateImage(ctx context.Context, containerName string, image string, pull bool) error {
 	// 获取容器配置
 	inspectJSON, err := d.Inspect(ctx, containerName)
 	if err != nil {
 		return err
 	}
-
-	// 拉取新镜像
-	if err = d.ImagePull(ctx, image, nil); err != nil {
-		return fmt.Errorf("ImagePull() error: %w", err)
+	if pull {
+		// 拉取新镜像
+		if err = d.ImagePull(ctx, image, nil); err != nil {
+			return fmt.Errorf("ImagePull() error: %w", err)
+		}
 	}
 
 	// 删除旧容器
@@ -841,11 +844,13 @@ func encodedAuth(ref reference.Named, configFile driver.Auth) (string, error) {
 //	@param file
 //	@return *types2.Project
 //	@return error
-func ComposeYamlRead(ctx context.Context, file string) (*types2.Project, error) {
+func ComposeYamlRead(ctx context.Context, file string, envFiles ...string) (*types2.Project, error) {
 	opts, err := cli.NewProjectOptions(
 		[]string{file},
 		//  关闭一致性校验
 		cli.WithConsistency(false),
+		cli.WithEnvFiles(envFiles...),
+		cli.WithDotEnv,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("NewProjectOptions() err:%w", err)
