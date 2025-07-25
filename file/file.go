@@ -197,6 +197,10 @@ func Copy(src, dest string) error {
 			return fmt.Errorf("写入文件失败: %w", err)
 		}
 	}
+	// flush 到磁盘
+	if err := destFile.Sync(); err != nil {
+		return fmt.Errorf("文件同步失败: %w", err)
+	}
 	// 强制修改文件权限
 	if err = destFile.Chmod(stat.Mode()); err != nil {
 		return fmt.Errorf("修改文件权限失败: %w", err)
