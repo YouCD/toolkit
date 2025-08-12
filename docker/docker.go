@@ -45,6 +45,7 @@ var (
 	ErrNetworkExist                 = errors.New("docker network exist")
 	ErrNetworkNotExist              = errors.New("docker network not exist")
 	ErrNoYaml                       = errors.New("没有找到ymal文件")
+	ErrSubnetGateway                = errors.New("docker.subnet.gateway 未找到")
 )
 var (
 	d *Docker
@@ -952,4 +953,16 @@ func (d *Docker) ParserYamlFiles(ctx context.Context, yamlFiles ...string) (map[
 		sortProjects[pg] = configs
 	}
 	return sortProjects, nil
+}
+
+// GetDockerBridge 获取docker0的IP地址
+func (d *Docker) GetDockerBridge(ctx context.Context) (string, error) {
+	n, err := d.NetworkListByName(ctx, "bridge")
+	if err != nil {
+		return "", fmt.Errorf("Docker.NetworkListByName(),err:%w", err)
+	}
+	if len(n.IPAM.Config) == 0 {
+		return "", ErrSubnetGateway
+	}
+	return n.IPAM.Config[0].Gateway, nil
 }
