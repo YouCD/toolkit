@@ -252,3 +252,20 @@ func pathOpener(path string) tarball.Opener {
 		return os.Open(path)
 	}
 }
+
+// ImageTag 获取镜像标签
+func ImageTag(tarballFilePath string) ([]string, error) {
+	//  从文件中读取 清单
+	manifest, err := tarball.LoadManifest(pathOpener(tarballFilePath))
+	if err != nil {
+		return nil, fmt.Errorf("错误：无法从 tarball 文件中读取清单,err: %w", err)
+	}
+
+	for _, descriptor := range manifest {
+		if len(descriptor.RepoTags) == 0 {
+			continue
+		}
+		return descriptor.RepoTags, nil
+	}
+	return nil, errors.New("未找到镜像标签")
+}

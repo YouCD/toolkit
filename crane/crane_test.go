@@ -84,3 +84,7 @@ func TestPushTarImage(t *testing.T) {
 	}
 	fmt.Printf("此次Release耗时: %s\n", time.Since(now))
 }
+
+func TestImageTag(t *testing.T) {
+	fmt.Println(ImageTag("/tmp/b.tar"))
+}
