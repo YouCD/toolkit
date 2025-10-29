@@ -66,7 +66,8 @@ func NewDocker(ctx context.Context, envFiles ...string) (*Docker, error) {
 		return nil, fmt.Errorf("new docker dockerClient error: %w", err)
 	}
 	// 检查docker是否可用
-	if _, err = dockerClient.Ping(ctx); err != nil {
+	_, err = dockerClient.Ping(ctx)
+	if err != nil {
 		return nil, fmt.Errorf("new docker dockerClient,err: %w", err)
 	}
 
@@ -76,7 +77,8 @@ func NewDocker(ctx context.Context, envFiles ...string) (*Docker, error) {
 		panic(err)
 	}
 	// 初始化 docker cli  client
-	if err = dockerCli.Initialize(cliflags.NewClientOptions()); err != nil {
+	err = dockerCli.Initialize(cliflags.NewClientOptions())
+	if err != nil {
 		return nil, fmt.Errorf("new docker cli client error: %w", err)
 	}
 	// 创建compose service
@@ -114,14 +116,16 @@ func (d *Docker) WatchContainerCreate(ctx context.Context, action events.Action,
 			// event.Action  exec_start exec_die start
 			var containerName string
 			// 优先使用compose服务名
-			if s, ok := event.Actor.Attributes["com.docker.compose.service"]; ok {
+			s, ok := event.Actor.Attributes["com.docker.compose.service"]
+			if ok {
 				containerName = s
 			} else {
 				containerName = event.Actor.Attributes["name"]
 			}
 
 			if event.Action == action && watch != nil {
-				if err := watch(ctx, containerName, event); err != nil {
+				err := watch(ctx, containerName, event)
+				if err != nil {
 					return err
 				}
 			}
@@ -253,7 +257,8 @@ func (d *Docker) ContainerStart(ctx context.Context, containers ...string) error
 			errs = append(errs, err)
 			continue
 		}
-		if err = d.DockerCLIClient.Client().ContainerStart(ctx, inspect.ID, container.StartOptions{}); err != nil {
+		err = d.DockerCLIClient.Client().ContainerStart(ctx, inspect.ID, container.StartOptions{})
+		if err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -289,7 +294,8 @@ func (d *Docker) ContainerStop(ctx context.Context, containers ...string) error 
 			errs = append(errs, err)
 			continue
 		}
-		if err = d.DockerCLIClient.Client().ContainerStop(ctx, inspect.ID, container.StopOptions{}); err != nil {
+		err = d.DockerCLIClient.Client().ContainerStop(ctx, inspect.ID, container.StopOptions{})
+		if err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -327,21 +333,6 @@ func (d *Docker) FindSVCFromYamlFile(ctx context.Context, service, project strin
 	return yamlFile, yamlFiles, nil
 }
 
-func (d *Docker) svcInComposeFile(ctx context.Context, file, service string, ) (*types2.ServiceConfig, bool, error) {
-	projectObj, err := ComposeYamlRead(ctx, file, d.EnvFiles...)
-	if err != nil {
-		return nil, false, err
-	}
-
-	for _, s := range projectObj.Services {
-		if s.Name == service {
-			return &s, true, nil
-		}
-	}
-
-	return nil, false, nil
-}
-
 // ContainerUpdateImage
 //
 //	@Description: 更新容器镜像
@@ -357,13 +348,15 @@ func (d *Docker) ContainerUpdateImage(ctx context.Context, containerName string,
 	}
 	if pull {
 		// 拉取新镜像
-		if err = d.ImagePull(ctx, image, nil); err != nil {
+		err = d.ImagePull(ctx, image, nil)
+		if err != nil {
 			return fmt.Errorf("ImagePull() error: %w", err)
 		}
 	}
 
 	// 删除旧容器
-	if err = d.ContainerRemove(ctx, containerName); err != nil {
+	err = d.ContainerRemove(ctx, containerName)
+	if err != nil {
 		return err
 	}
 
@@ -384,7 +377,8 @@ func (d *Docker) ContainerUpdateImage(ctx context.Context, containerName string,
 			return err
 		}
 
-		if err := d.DockerCLIClient.Client().ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+		err = d.DockerCLIClient.Client().ContainerStart(ctx, resp.ID, container.StartOptions{})
+		if err != nil {
 			// 某些容器无用户配置
 			if strings.Contains(err.Error(), "no matching entries in passwd file") {
 				_ = d.ContainerRemove(ctx, containerName)
@@ -467,7 +461,8 @@ func (d *Docker) ContainerRemove(ctx context.Context, containerName string) erro
 		return fmt.Errorf("inspect() error: %w", err)
 	}
 
-	if err := d.DockerCLIClient.Client().ContainerRemove(ctx, containerJSON.ID, container.RemoveOptions{Force: true}); err != nil {
+	err = d.DockerCLIClient.Client().ContainerRemove(ctx, containerJSON.ID, container.RemoveOptions{Force: true})
+	if err != nil {
 		return fmt.Errorf("%s :ContainerRemove error, err: %w", containerName, err)
 	}
 
@@ -484,14 +479,16 @@ func (d *Docker) ContainerRemove(ctx context.Context, containerName string) erro
 func (d *Docker) CreateRegistry(ctx context.Context, imageName, repoPath, hostPort string) error {
 	registryName := "registry"
 	if d.ContainerIsExits(ctx, registryName) {
-		if err := d.ContainerRemove(ctx, registryName); err != nil {
+		err := d.ContainerRemove(ctx, registryName)
+		if err != nil {
 			return fmt.Errorf("registry容器删除失败 error: %w", err)
 		}
 	}
 
 	if imageName != "" {
 		// 导入 registry 镜像
-		if err := d.ImageLoadFromFile(ctx, imageName); err != nil {
+		err := d.ImageLoadFromFile(ctx, imageName)
+		if err != nil {
 			return fmt.Errorf("load镜像 error: %w", err)
 		}
 	} else {
@@ -503,12 +500,14 @@ func (d *Docker) CreateRegistry(ctx context.Context, imageName, repoPath, hostPo
 			_ = imageResp.Close()
 		}()
 		var buf bytes.Buffer
-		if _, err := io.Copy(&buf, imageResp); err != nil {
+		_, err = io.Copy(&buf, imageResp)
+		if err != nil {
 			return fmt.Errorf("copy image error: %w", err)
 		}
 	}
 
-	if err := os.MkdirAll(repoPath, 0755); err != nil {
+	err := os.MkdirAll(repoPath, 0755)
+	if err != nil {
 		return fmt.Errorf("创建挂载目录 error: %w", err)
 	}
 	// 文件挂载
@@ -548,7 +547,8 @@ func (d *Docker) CreateRegistry(ctx context.Context, imageName, repoPath, hostPo
 		return fmt.Errorf("registry创建 error: %w", err)
 	}
 
-	if err := d.DockerCLIClient.Client().ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+	err = d.DockerCLIClient.Client().ContainerStart(ctx, resp.ID, container.StartOptions{})
+	if err != nil {
 		return fmt.Errorf("启动registry error: %w", err)
 	}
 	return nil
@@ -569,19 +569,6 @@ func (d *Docker) ImageLoadFromFile(ctx context.Context, imagePath string) error 
 		_ = file.Close()
 	}()
 	return d.imageLoadFromIOReader(ctx, file)
-}
-
-// imageLoadFromIOReader
-//
-//	@Description: 从IO中读取镜像
-//	@receiver d
-//	@param input
-//	@return error
-func (d *Docker) imageLoadFromIOReader(ctx context.Context, input io.Reader) error {
-	if _, err := d.DockerCLIClient.Client().ImageLoad(ctx, input, client.ImageLoadWithQuiet(true)); err != nil {
-		return fmt.Errorf("加载镜像 error: %w", err)
-	}
-	return nil
 }
 
 // ImagePull
@@ -606,39 +593,22 @@ func (d *Docker) ImagePull(ctx context.Context, regImage string, newTagFunc func
 		_ = imageResp.Close()
 	}()
 	buf := bytes.Buffer{}
-	if _, err = io.Copy(&buf, imageResp); err != nil {
+	_, err = io.Copy(&buf, imageResp)
+	if err != nil {
 		return fmt.Errorf("copy image error: %w", err)
 	}
 	if newTagFunc != nil {
 		newName := newTagFunc(regImage)
-		if err = d.DockerCLIClient.Client().ImageTag(ctx, regImage, newName); err != nil {
+		err = d.DockerCLIClient.Client().ImageTag(ctx, regImage, newName)
+		if err != nil {
 			return fmt.Errorf("tag镜像:%s error: %w", newName, err)
 		}
-		if _, err = d.DockerCLIClient.Client().ImageRemove(ctx, regImage, image.RemoveOptions{}); err != nil {
+		_, err = d.DockerCLIClient.Client().ImageRemove(ctx, regImage, image.RemoveOptions{})
+		if err != nil {
 			return fmt.Errorf("remove镜像:%s error: %w", regImage, err)
 		}
 	}
 	return nil
-}
-
-// matchAuthConfig
-//
-//	@Description: 通过镜像名匹配账户信息
-//	@receiver d
-//	@param regImage
-//	@return string
-//	@return error
-func (d *Docker) matchAuthConfig(regImage string) (string, error) {
-	ref, err := reference.ParseNormalizedNamed(regImage)
-	if err != nil {
-		return "", fmt.Errorf("parse镜像:%s error: %w", regImage, err)
-	}
-
-	authConfigs, err := encodedAuth(ref, d.DockerCLIClient.ConfigFile())
-	if err != nil {
-		return "", fmt.Errorf("encode auth, error: %w", err)
-	}
-	return authConfigs, nil
 }
 
 // NetworkCreate
@@ -670,7 +640,8 @@ func (d *Docker) NetworkCreate(ctx context.Context, netName, ipCIDR string) erro
 		},
 	}
 
-	if _, err = d.DockerCLIClient.Client().NetworkCreate(ctx, netName, options); err != nil {
+	_, err = d.DockerCLIClient.Client().NetworkCreate(ctx, netName, options)
+	if err != nil {
 		if errors.Is(err, ipamapi.ErrPoolOverlap) {
 			return ErrDockerNetworkPollExist
 		}
@@ -722,7 +693,8 @@ func (d *Docker) ComposeServiceUp(ctx context.Context, p *types2.Project, recrea
 			WaitTimeout: time.Second * 3000,
 		},
 	}
-	if err := d.ComposeService.Up(ctx, p, upOpts); err != nil {
+	err := d.ComposeService.Up(ctx, p, upOpts)
+	if err != nil {
 		return fmt.Errorf("compose up, error: %w", err)
 	}
 	return nil
@@ -742,7 +714,8 @@ func (d *Docker) ComposeServiceRestart(ctx context.Context, p *types2.Project) e
 		//NoDeps:   false,
 	}
 
-	if err := d.ComposeService.Restart(ctx, p.Name, Opts); err != nil {
+	err := d.ComposeService.Restart(ctx, p.Name, Opts)
+	if err != nil {
 		return fmt.Errorf("compose restart, error: %w", err)
 	}
 	return nil
@@ -876,7 +849,7 @@ func (d *Docker) ContainerLogs(ctx context.Context, containerName string, option
 	for {
 		_, err = reader.Read(hdr)
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				// 如果是 follow 模式，可以继续等待
 				if defaultOptions.Follow {
 					time.Sleep(100 * time.Millisecond)
@@ -965,4 +938,53 @@ func (d *Docker) GetDockerBridge(ctx context.Context) (string, error) {
 		return "", ErrSubnetGateway
 	}
 	return n.IPAM.Config[0].Gateway, nil
+}
+
+func (d *Docker) svcInComposeFile(ctx context.Context, file, service string) (*types2.ServiceConfig, bool, error) {
+	projectObj, err := ComposeYamlRead(ctx, file, d.EnvFiles...)
+	if err != nil {
+		return nil, false, err
+	}
+
+	for _, s := range projectObj.Services {
+		if s.Name == service {
+			return &s, true, nil
+		}
+	}
+
+	return nil, false, nil
+}
+
+// matchAuthConfig
+//
+//	@Description: 通过镜像名匹配账户信息
+//	@receiver d
+//	@param regImage
+//	@return string
+//	@return error
+func (d *Docker) matchAuthConfig(regImage string) (string, error) {
+	ref, err := reference.ParseNormalizedNamed(regImage)
+	if err != nil {
+		return "", fmt.Errorf("parse镜像:%s error: %w", regImage, err)
+	}
+
+	authConfigs, err := encodedAuth(ref, d.DockerCLIClient.ConfigFile())
+	if err != nil {
+		return "", fmt.Errorf("encode auth, error: %w", err)
+	}
+	return authConfigs, nil
+}
+
+// imageLoadFromIOReader
+//
+//	@Description: 从IO中读取镜像
+//	@receiver d
+//	@param input
+//	@return error
+func (d *Docker) imageLoadFromIOReader(ctx context.Context, input io.Reader) error {
+	_, err := d.DockerCLIClient.Client().ImageLoad(ctx, input, client.ImageLoadWithQuiet(true))
+	if err != nil {
+		return fmt.Errorf("加载镜像 error: %w", err)
+	}
+	return nil
 }

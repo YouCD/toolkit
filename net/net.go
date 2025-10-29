@@ -48,6 +48,7 @@ func GetHostIPByIndex(cidr string, index int) net.IP {
 func CIDR2IPNetworkMask(cidr string) (string, string, error) {
 	ipAddrObjStr := ipaddr.NewIPAddressString(cidr)
 	if !ipAddrObjStr.IsValid() {
+		//nolint:err113
 		return "", "", fmt.Errorf("invalid cidr")
 	}
 
@@ -55,17 +56,15 @@ func CIDR2IPNetworkMask(cidr string) (string, string, error) {
 	return ipAddrObj.GetNetIPAddr().IP.String(), ipAddrObj.GetNetworkMask().String(), nil
 }
 
-//
-// CIDR2IPNet
-//  @Description: 将CIDR转换成 netIP
-//  @param cidr
-//  @return string
-//  @return error
-//
+var (
+	ErrInvalidCIDR = errors.New("invalid cidr")
+)
+
+// CIDR2IPNet 将CIDR转换成 netIP
 func CIDR2IPNet(cidr string) (string, error) {
 	ipAddrObjStr := ipaddr.NewIPAddressString(cidr)
 	if !ipAddrObjStr.IsValid() {
-		return "", fmt.Errorf("invalid cidr")
+		return "", ErrInvalidCIDR
 	}
 
 	ipAddrObj := ipAddrObjStr.GetAddress()

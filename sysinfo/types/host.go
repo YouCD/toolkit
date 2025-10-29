@@ -60,8 +60,8 @@ type Host struct {
 	BPFFSCheck      bool                              `json:"bpffsCheck"`
 	CGroupVersion   CGroupVersion                     `json:"cgroupVersion"`
 	DrivePerfResult map[string]*dperf.DrivePerfResult `json:"drivePerfResult"`
-	IPs             []string                          `json:"IPs"` //nolint:tagliatelle
-	CPUInfo         *cpuid.CPUInfo                    `json:"CPUInfo"`
+	IPs             []string                          `json:"IPs"`     //nolint:tagliatelle
+	CPUInfo         *cpuid.CPUInfo                    `json:"CPUInfo"` //nolint:tagliatelle
 }
 
 func (h *Host) Platform() OSPlatform {

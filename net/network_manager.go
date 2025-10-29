@@ -1,6 +1,7 @@
 package net
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -16,9 +17,9 @@ var (
 )
 
 type NetworkManager interface {
-	SetNetWork(addresses, dns []string, gateway, cni string) error
+	SetNetWork(ctx context.Context, addresses, dns []string, gateway, cni string) error
 	GetCNI(addresses string) (string, error)
-	Rollback() error
+	Rollback(ctx context.Context) error
 }
 
 func NewNetworkManager() (NetworkManager, error) {

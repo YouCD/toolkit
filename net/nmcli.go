@@ -1,6 +1,7 @@
 package net
 
 import (
+	"context"
 	"fmt"
 	"strings"
 )
@@ -12,16 +13,16 @@ func NewNMcli() *NMCli {
 	return &NMCli{}
 }
 
-func (n *NMCli) SetNetWork(addresses, dns []string, gateway, cni string) error {
+func (n *NMCli) SetNetWork(ctx context.Context, addresses, dns []string, gateway, cni string) error {
 	//  nmcli connection modify br0 ipv4.gateway 192.168.104.88
 	addressesStr := strings.Join(addresses, ",")
 	dnsStr := strings.Join(dns, ",")
 	cmdStr := fmt.Sprintf("nmcli connection modify %s ipv4.addresses %s ipv4.gateway %s ipv4.dns %s ifname %s", cni, addressesStr, gateway, dnsStr, cni)
-	err := bash(cmdStr)
+	err := bash(ctx, cmdStr)
 	if err != nil {
 		return fmt.Errorf("bash: %w", err)
 	}
-	err = bash("nmcli connection up " + cni)
+	err = bash(ctx, "nmcli connection up "+cni)
 	if err != nil {
 		return fmt.Errorf("bash: %w", err)
 	}
@@ -36,6 +37,6 @@ func (n *NMCli) GetCNI(addresses string) (string, error) {
 	return cni, err
 }
 
-func (n *NMCli) Rollback() error {
+func (n *NMCli) Rollback(ctx context.Context) error {
 	return nil
 }

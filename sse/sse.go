@@ -1,6 +1,7 @@
 package sse
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -50,16 +51,20 @@ func Sse(msg chan string, uri, streamID string, l net.Listener) {
 		}
 	}()
 	//nolint:gosec
-	if err := http.Serve(l, mux); err != nil {
+	err := http.Serve(l, mux)
+	if err != nil {
 		panic(err)
 	}
 }
-func NewNetListen(port int) (net.Listener, string, int) {
+func NewNetListen(ctx context.Context, port int) (net.Listener, string, int) {
 	address, err := toolkitNet.PhysicsCNIAddress()
 	if err != nil {
 		panic(err)
 	}
-	l, err := net.Listen("tcp4", fmt.Sprintf("%s:%d", address[0], port))
+
+	// 使用 ListenConfig 替代直接调用 net.Listen
+	listenConfig := &net.ListenConfig{}
+	l, err := listenConfig.Listen(ctx, "tcp4", fmt.Sprintf("%s:%d", address[0], port))
 	if err != nil {
 		panic(err)
 	}

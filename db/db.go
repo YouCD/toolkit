@@ -67,7 +67,7 @@ func InitDB(user, pwd, host, port, name string, logLevel logger.LogLevel) {
 	}
 }
 
-// 不用担心协程并发使用同样的db对象会共用同一个连接，db对象在调用他的方法的时候会从数据库连接池中获取新的连接
+// GetDB 不用担心协程并发使用同样的db对象会共用同一个连接，db对象在调用他的方法的时候会从数据库连接池中获取新的连接
 func GetDB() *gorm.DB {
 	return db
 }

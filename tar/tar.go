@@ -60,7 +60,7 @@ func ExtractTarZstOrGzipFile(src, dest string, progressChan chan string) error {
 
 	for {
 		header, err := tarReader.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -74,15 +74,19 @@ func ExtractTarZstOrGzipFile(src, dest string, progressChan chan string) error {
 		case tar.TypeDir:
 			pg.DirCount++
 			pushMsg(pg, progressChan)
-			if err := os.MkdirAll(target,  os.FileMode(header.Mode)); err != nil {
+			//nolint:gosec
+			err := os.MkdirAll(target, os.FileMode(header.Mode))
+			if err != nil {
 				return fmt.Errorf("创建文件夹失败: %s,err：%w", target, err)
 			}
 			// 强制设置权限（覆盖原有的）
+			//nolint:gosec
 			err = os.Chmod(target, os.FileMode(header.Mode))
 			if err != nil {
-				return err
+				return fmt.Errorf("修改文件权限失败: %s,err：%w", target, err)
 			}
-			if err := os.Chown(target, header.Uid, header.Gid); err != nil {
+			err = os.Chown(target, header.Uid, header.Gid)
+			if err != nil {
 				return fmt.Errorf("修改文件所有者失败: %s,err：%w", target, err)
 			}
 
@@ -90,21 +94,26 @@ func ExtractTarZstOrGzipFile(src, dest string, progressChan chan string) error {
 		case tar.TypeReg:
 			pg.FileCount++
 			pushMsg(pg, progressChan)
+			//nolint:gosec
 			writeFile, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
 			if err != nil {
 				return fmt.Errorf("创建文件失败: %s,err：%w", target, err)
 			}
 
 			// 强制修改文件权限
-			if err = writeFile.Chmod(os.FileMode(header.Mode)); err != nil {
+			//nolint:gosec
+			err = writeFile.Chmod(os.FileMode(header.Mode))
+			if err != nil {
 				return fmt.Errorf("修改文件权限失败: %s,err：%w", target, err)
 			}
 
-			if err := os.Chown(target, header.Uid, header.Gid); err != nil {
+			err = os.Chown(target, header.Uid, header.Gid)
+			if err != nil {
 				return fmt.Errorf("修改文件所有者失败: %s,err：%w", target, err)
 			}
 			//nolint:gosec
-			if _, err := io.Copy(writeFile, tarReader); err != nil {
+			_, err = io.Copy(writeFile, tarReader)
+			if err != nil {
 				return fmt.Errorf("写入文件失败: %s,err：%w", target, err)
 			}
 			writeFile.Close()
@@ -140,7 +149,8 @@ func Dir(src, dst string) error {
 
 	defer fileHandle.Close()
 
-	if _, err = fileHandle.Write(data); err != nil {
+	_, err = fileHandle.Write(data)
+	if err != nil {
 		return fmt.Errorf("写入文件失败: %s,err：%w", dst, err)
 	}
 	return nil
@@ -256,12 +266,14 @@ func tarDirWithFunc(src string, dirFunc dirFunc) ([]byte, error) {
 		return nil, err
 	}
 	// 确保 tar 包中的数据被刷新到 gzip 压缩流中
-	if err := tw.Close(); err != nil {
+	err = tw.Close()
+	if err != nil {
 		return nil, fmt.Errorf("关闭 tar 包: %w", err)
 	}
 
 	// 确保 gzip 压缩流中的数据被刷新到 data 中
-	if err := gw.Close(); err != nil {
+	err = gw.Close()
+	if err != nil {
 		return nil, fmt.Errorf("关闭 gzip 压缩流: %w", err)
 	}
 
@@ -286,7 +298,8 @@ func tarDirHandler(src string, dirFunc dirFunc, tw *tar.Writer) error {
 		}
 
 		// 写入文件信息
-		if err := tw.WriteHeader(hdr); err != nil {
+		err = tw.WriteHeader(hdr)
+		if err != nil {
 			return fmt.Errorf("写入文件信息: %w", err)
 		}
 
@@ -343,7 +356,8 @@ func FileWithFunc(fileName string, dirFunc dirFunc) ([]byte, error) {
 	}
 
 	// 写入文件信息
-	if err := tw.WriteHeader(hdr); err != nil {
+	err = tw.WriteHeader(hdr)
+	if err != nil {
 		return nil, errors.WithMessage(err, "写入文件信息")
 	}
 
@@ -354,15 +368,18 @@ func FileWithFunc(fileName string, dirFunc dirFunc) ([]byte, error) {
 	}
 
 	// 确保 tar 包中的数据被刷新到 gzip 压缩流中
-	if err := tw.Close(); err != nil {
+	err = tw.Close()
+	if err != nil {
 		return nil, fmt.Errorf("关闭tar文件: %w", err)
 	}
 
 	// 确保 gzip 压缩流中的数据被刷新到 data 中
-	if err := gw.Close(); err != nil {
+	err = gw.Close()
+	if err != nil {
 		return nil, fmt.Errorf("关闭 gzip 压缩流: %w", err)
 	}
-	if err := fr.Close(); err != nil {
+	err = fr.Close()
+	if err != nil {
 		return nil, fmt.Errorf("关闭文件: %w", err)
 	}
 

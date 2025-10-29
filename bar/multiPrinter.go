@@ -19,6 +19,7 @@ var DefaultMultiPrinter = MultiPrinter{
 	area:        pterm.DefaultArea,
 }
 
+//nolint:recvcheck
 type MultiPrinter struct {
 	IsActive    bool
 	Writer      io.Writer
@@ -58,30 +59,6 @@ func (p *MultiPrinter) NewWriter() io.Writer {
 	buf := bytes.NewBufferString("")
 	p.buffers = append(p.buffers, buf)
 	return buf
-}
-
-// getString returns all buffers appended and separated by a newline.
-func (p *MultiPrinter) getString() string {
-	var buffer bytes.Buffer
-	for _, b := range p.buffers {
-		s := b.String()
-		s = strings.Trim(s, "\n")
-		parts := strings.Split(s, "\r") // only get the last override
-		s = parts[len(parts)-1]
-		// check if s is empty, if so get one part before, repeat until not empty
-		for s == "" {
-			parts = parts[:len(parts)-1]
-			if len(parts)-1 < 0 {
-				break
-			}
-			s = parts[len(parts)-1]
-		}
-
-		s = strings.Trim(s, "\n\r")
-		buffer.WriteString(s)
-		buffer.WriteString("\n")
-	}
-	return buffer.String()
 }
 
 func (p *MultiPrinter) Start() (*MultiPrinter, error) {
@@ -129,4 +106,28 @@ func (p MultiPrinter) GenericStop() (*pterm.LivePrinter, error) {
 	p2, _ := p.Stop()
 	lp := pterm.LivePrinter(p2)
 	return &lp, nil
+}
+
+// getString returns all buffers appended and separated by a newline.
+func (p *MultiPrinter) getString() string {
+	var buffer bytes.Buffer
+	for _, b := range p.buffers {
+		s := b.String()
+		s = strings.Trim(s, "\n")
+		parts := strings.Split(s, "\r") // only get the last override
+		s = parts[len(parts)-1]
+		// check if s is empty, if so get one part before, repeat until not empty
+		for s == "" {
+			parts = parts[:len(parts)-1]
+			if len(parts)-1 < 0 {
+				break
+			}
+			s = parts[len(parts)-1]
+		}
+
+		s = strings.Trim(s, "\n\r")
+		buffer.WriteString(s)
+		buffer.WriteString("\n")
+	}
+	return buffer.String()
 }

@@ -35,7 +35,8 @@ type Git struct {
 //	@return error
 func NewGit(sshURLOrHTTPURL, ref string) (*Git, error) {
 	sshURL := sshURLOrHTTPURL
-	if parse, err := url.Parse(sshURLOrHTTPURL); err == nil {
+	parse, err := url.Parse(sshURLOrHTTPURL)
+	if err == nil {
 		sshURL = fmt.Sprintf("git@%s:%s", parse.Host, parse.Path)
 	}
 

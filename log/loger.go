@@ -76,7 +76,7 @@ func InitBuffer(logBuffer *bytes.Buffer) {
 	core := zapcore.NewCore(
 		zapcore.NewConsoleEncoder(newEncoderConfig()),
 		zapcore.NewMultiWriteSyncer(zapcore.AddSync(logBuffer), zapcore.AddSync(os.Stdout)), // 打印到控制台和文件
-		atomicLevel,                                                                         // 日志级别
+		atomicLevel, // 日志级别
 	)
 	l := zap.New(core, zap.AddCaller(), zap.AddCallerSkip(1), zap.Development())
 	logger = l.Sugar()
@@ -93,11 +93,11 @@ func newCore(cfg *Config) zapcore.Core {
 	}
 	if cfg.LumberjackCfg != nil {
 		lumberjackLogger = &lumberjack.Logger{
-			Filename:   cfg.LumberjackCfg.Filename,   //日志文件存放目录，如果文件夹不存在会自动创建
-			MaxSize:    cfg.LumberjackCfg.MaxSize,    //文件大小限制,单位100MB
-			MaxBackups: cfg.LumberjackCfg.MaxBackups, //最大保留日志文件数量
-			MaxAge:     cfg.LumberjackCfg.MaxAge,     //日志文件保留天数
-			Compress:   cfg.LumberjackCfg.Compress,   //是否压缩处理
+			Filename:   cfg.LumberjackCfg.Filename,   // 日志文件存放目录，如果文件夹不存在会自动创建
+			MaxSize:    cfg.LumberjackCfg.MaxSize,    // 文件大小限制,单位100MB
+			MaxBackups: cfg.LumberjackCfg.MaxBackups, // 最大保留日志文件数量
+			MaxAge:     cfg.LumberjackCfg.MaxAge,     // 日志文件保留天数
+			Compress:   cfg.LumberjackCfg.Compress,   // 是否压缩处理
 			LocalTime:  cfg.LumberjackCfg.LocalTime,
 		}
 		infoFileWriteSyncer := zapcore.AddSync(lumberjackLogger)

@@ -44,7 +44,8 @@ func (e *Embed) EmbedDataMetaInfo(filename string) (fs.FileInfo, error) {
 //	@param skipFileFunc
 //	@return error
 func (e *Embed) CopyEmbedDataFolderWithSkipFileFunc(embedSrcDir, dstDir string, skipFileFunc func(filename string) bool) error {
-	if err := os.MkdirAll(dstDir, 0755); err != nil {
+	err := os.MkdirAll(dstDir, 0755)
+	if err != nil {
 		return fmt.Errorf("创建目标文件夹失败: %w", err)
 	}
 	// 获取源文件夹信息
@@ -54,7 +55,8 @@ func (e *Embed) CopyEmbedDataFolderWithSkipFileFunc(embedSrcDir, dstDir string, 
 	}
 
 	// 创建目标文件夹
-	if err = os.MkdirAll(dstDir, stat.Mode()); err != nil {
+	err = os.MkdirAll(dstDir, stat.Mode())
+	if err != nil {
 		return fmt.Errorf("创建目标文件夹失败: %w", err)
 	}
 
@@ -74,17 +76,35 @@ func (e *Embed) CopyEmbedDataFolderWithSkipFileFunc(embedSrcDir, dstDir string, 
 		destinationPath := filepath.Join(dstDir, entry.Name())
 		// 递归拷贝子文件夹
 		if entry.IsDir() {
-			if err = e.CopyEmbedDataFolderWithSkipFileFunc(sourcePath, destinationPath, skipFileFunc); err != nil {
+			err = e.CopyEmbedDataFolderWithSkipFileFunc(sourcePath, destinationPath, skipFileFunc)
+			if err != nil {
 				return err
 			}
 			continue
 		}
 		// 拷贝文件
-		if err = e.copyEmbedDataFile(sourcePath, destinationPath); err != nil {
+		err = e.copyEmbedDataFile(sourcePath, destinationPath)
+		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// CopyEmbedDataFile
+//
+//	@Description: 从embed文件夹中复制文件
+//	@receiver e
+//	@param embedSrcFile
+//	@param dstFile
+//	@return error
+func (e *Embed) CopyEmbedDataFile(embedSrcFile, dstFile string) error {
+	err := os.MkdirAll(filepath.Dir(dstFile), 0755)
+	if err != nil {
+		return fmt.Errorf("创建目标文件夹失败: %w", err)
+	}
+	// 拷贝文件
+	return e.copyEmbedDataFile(embedSrcFile, dstFile)
 }
 
 // copyEmbedDataFile
@@ -105,23 +125,9 @@ func (e *Embed) copyEmbedDataFile(embedSrcFile, dstFile string) error {
 	}
 
 	// 写入目标文件
-	if err = os.WriteFile(dstFile, fileData, stat.Mode()); err != nil {
+	err = os.WriteFile(dstFile, fileData, stat.Mode())
+	if err != nil {
 		return fmt.Errorf("写入目标文件失败: %w", err)
 	}
 	return nil
-}
-
-// CopyEmbedDataFile
-//
-//	@Description: 从embed文件夹中复制文件
-//	@receiver e
-//	@param embedSrcFile
-//	@param dstFile
-//	@return error
-func (e *Embed) CopyEmbedDataFile(embedSrcFile, dstFile string) error {
-	if err := os.MkdirAll(filepath.Dir(dstFile), 0755); err != nil {
-		return fmt.Errorf("创建目标文件夹失败: %w", err)
-	}
-	// 拷贝文件
-	return e.copyEmbedDataFile(embedSrcFile, dstFile)
 }

@@ -58,7 +58,8 @@ func (c *Config) ExecuteContext(ctx context.Context, commd string, commdArgs ...
 	cmd.Args = append(cmd.Args, commd)
 	cmd.Args = append(cmd.Args, commdArgs...)
 
-	if err := cmd.Run(); err != nil {
+	err := cmd.Run()
+	if err != nil {
 		return stdout.String(), stderr.String(), fmt.Errorf("cmd.Run(): %w", err)
 	}
 

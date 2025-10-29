@@ -2,6 +2,7 @@ package edit
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/fs"
@@ -40,32 +41,6 @@ func NewConfigEdit(filePath string) (*ConfigEdit, error) {
 	return c, nil
 }
 
-// openFileInEditor
-//
-//	@Description: 调用系统编辑器打开文件
-//	@receiver c
-//	@param filename
-//	@return error
-func (c ConfigEdit) openFileInEditor(filename string) error {
-	editor := os.Getenv("EDITOR")
-	if editor == "" {
-		editor = DefaultEditor
-	}
-
-	// 判断外部命令是否存在
-	executable, err := exec.LookPath(editor)
-	if err != nil {
-		return fmt.Errorf("editor not found:%w", err)
-	}
-
-	cmd := exec.Command(executable, filename)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	//nolint:wrapcheck
-	return cmd.Run()
-}
-
 type verifyFunc func(filename string) error
 
 // EditConfig
@@ -74,7 +49,7 @@ type verifyFunc func(filename string) error
 //	@receiver c
 //	@param data
 //	@return error
-func (c ConfigEdit) EditConfig(verify verifyFunc) error {
+func (c ConfigEdit) EditConfig(ctx context.Context, verify verifyFunc) error {
 	// 1. 创建临时文件
 	file, err := os.CreateTemp(os.TempDir(), "*.yaml")
 	if err != nil {
@@ -83,21 +58,25 @@ func (c ConfigEdit) EditConfig(verify verifyFunc) error {
 	name := file.Name()
 
 	// 2. 将初始化数据写入临时文件中
-	if _, err = io.Copy(file, bytes.NewReader(c.configData.data)); err != nil {
+	_, err = io.Copy(file, bytes.NewReader(c.configData.data))
+	if err != nil {
 		return fmt.Errorf("写入临时文件 err:%w", err)
 	}
-	if err = file.Close(); err != nil {
+	err = file.Close()
+	if err != nil {
 		return fmt.Errorf("关闭临时文件 err:%w", err)
 	}
 
 	// 3. 调用系统命令编辑已经有数据的文件
-	if err = c.openFileInEditor(name); err != nil {
+	err = c.openFileInEditor(ctx, name)
+	if err != nil {
 		return fmt.Errorf("编辑文件 err:%w", err)
 	}
 
 	// 4. 校验 配置文件
 	if verify != nil {
-		if err = verify(name); err != nil {
+		err = verify(name)
+		if err != nil {
 			return fmt.Errorf("配置文件格式错误:%w", err)
 		}
 	}
@@ -115,4 +94,30 @@ func (c ConfigEdit) EditConfig(verify verifyFunc) error {
 	}
 
 	return nil
+}
+
+// openFileInEditor
+//
+//	@Description: 调用系统编辑器打开文件
+//	@receiver c
+//	@param filename
+//	@return error
+func (c ConfigEdit) openFileInEditor(ctx context.Context, filename string) error {
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		editor = DefaultEditor
+	}
+
+	// 判断外部命令是否存在
+	executable, err := exec.LookPath(editor)
+	if err != nil {
+		return fmt.Errorf("editor not found:%w", err)
+	}
+
+	cmd := exec.CommandContext(ctx, executable, filename)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	//nolint:wrapcheck
+	return cmd.Run()
 }

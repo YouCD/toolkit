@@ -79,7 +79,8 @@ func TestPushTarImage(t *testing.T) {
 		base := path.Base(imageName)
 		return base
 	}
-	if err := TarballFile2Daemon(os.Args[1], rename, msgChan); err != nil {
+	err := TarballFile2Daemon(os.Args[1], rename, msgChan)
+	if err != nil {
 		t.Error(err)
 	}
 	fmt.Printf("此次Release耗时: %s\n", time.Since(now))

@@ -103,22 +103,6 @@ func (b *Bar) Success(success string) {
 	pterm.DefaultSpinner.WithWriter(b.multiBar.NewWriter()).Success(success)
 }
 
-var once sync.Once
-
-// run
-//
-//	@Description:运行bar
-//	@receiver b
-func (b *Bar) run() {
-	once.Do(func() {
-		b.Info(b.name)
-	})
-	start, _ := pterm.DefaultSpinner.WithWriter(b.multiBar.Writer).Start(fmt.Sprintf("%s...", b.name))
-
-	_, _ = b.multiBar.Start()
-	b.barMap.Store(b.name, start)
-}
-
 // StopStartBar
 //
 //	@Description: 停止一个 Start bar
@@ -153,15 +137,6 @@ func (b *Bar) Stop() {
 		b.mapLoad(b.name).Warning(b.name+": ", strings.Join(msg, ", "))
 	}
 	_, _ = b.multiBar.Stop()
-}
-
-//nolint:forcetypeassert
-func (b *Bar) mapLoad(name string) *pterm.SpinnerPrinter {
-	value, ok := b.barMap.Load(name)
-	if !ok {
-		return nil
-	}
-	return value.(*pterm.SpinnerPrinter)
 }
 
 // SetBarState
@@ -203,4 +178,29 @@ func (b *Bar) UpdateStartBarMsg(barName, msg string) {
 		b.mapLoad(barName).UpdateText(msg)
 		return
 	}
+}
+
+var once sync.Once
+
+// run
+//
+//	@Description:运行bar
+//	@receiver b
+func (b *Bar) run() {
+	once.Do(func() {
+		b.Info(b.name)
+	})
+	start, _ := pterm.DefaultSpinner.WithWriter(b.multiBar.Writer).Start(fmt.Sprintf("%s...", b.name))
+
+	_, _ = b.multiBar.Start()
+	b.barMap.Store(b.name, start)
+}
+
+//nolint:forcetypeassert
+func (b *Bar) mapLoad(name string) *pterm.SpinnerPrinter {
+	value, ok := b.barMap.Load(name)
+	if !ok {
+		return nil
+	}
+	return value.(*pterm.SpinnerPrinter)
 }

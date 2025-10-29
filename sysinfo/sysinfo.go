@@ -55,7 +55,8 @@ func SysInfo(ctx context.Context, skipDiskPerformance bool, installDirs []string
 		stat, err := os.Stat(dir)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
-				if err = os.MkdirAll(dir, 755); err != nil {
+				err = os.MkdirAll(dir, 755)
+				if err != nil {
 					errs = append(errs, ErrMkDirInstallDir)
 				}
 			} else {
@@ -106,7 +107,8 @@ func SysInfo(ctx context.Context, skipDiskPerformance bool, installDirs []string
 	//  获取主机时间
 	timeFetch(h)
 
-	if err = sudo(h); err != nil {
+	err = sudo(ctx, h)
+	if err != nil {
 		errs = append(errs, err)
 	}
 
@@ -121,12 +123,14 @@ func SysInfo(ctx context.Context, skipDiskPerformance bool, installDirs []string
 	checkBPFfs(h)
 
 	// service 检查
-	if err = service(ctx, h, services); err != nil {
+	err = service(ctx, h, services)
+	if err != nil {
 		errs = append(errs, err)
 	}
 
 	// CGroup版本
-	if err = cGroupVersion(h); err != nil {
+	err = cGroupVersion(h)
+	if err != nil {
 		errs = append(errs, err)
 	}
 
@@ -149,7 +153,8 @@ func SysInfo(ctx context.Context, skipDiskPerformance bool, installDirs []string
 //	@Description: bpf file system
 //	@param t
 func checkBPFfs(t *types.Host) {
-	if _, err := os.Stat("/sys/fs/bpf"); err != nil {
+	_, err := os.Stat("/sys/fs/bpf")
+	if err != nil {
 		t.BPFFSCheck = false
 		return
 	}
@@ -166,8 +171,8 @@ var (
 //	@Description:sudo检查
 //	@param t
 //	@return error
-func sudo(t *types.Host) error {
-	whoami, err := exec.Command("whoami").Output()
+func sudo(ctx context.Context, t *types.Host) error {
+	whoami, err := exec.CommandContext(ctx, "whoami").Output()
 	if err != nil {
 		return fmt.Errorf("whoami error: %w", err)
 	}
@@ -179,11 +184,12 @@ func sudo(t *types.Host) error {
 		return nil
 	}
 
-	cmd := exec.Command("sudo", "-S", "-l")
+	cmd := exec.CommandContext(ctx, "sudo", "-S", "-l")
 	cmd.Stdin = strings.NewReader(pwd + "\n")
 	var result buffer.Buffer
 	cmd.Stdout = &result
-	if err = cmd.Run(); err != nil {
+	err = cmd.Run()
+	if err != nil {
 		return fmt.Errorf("sudo -S -l: %w", err)
 	}
 	trimSpace := strings.TrimSpace(result.String())
@@ -295,7 +301,8 @@ func Mode() CGMode {
 	var cgMode CGMode
 
 	var st unix.Statfs_t
-	if err := unix.Statfs(unifiedMountpoint, &st); err != nil {
+	err := unix.Statfs(unifiedMountpoint, &st)
+	if err != nil {
 		cgMode = Unavailable
 		return cgMode
 	}
@@ -304,7 +311,8 @@ func Mode() CGMode {
 		cgMode = Unified
 	default:
 		cgMode = Legacy
-		if err := unix.Statfs(filepath.Join(unifiedMountpoint, "unified"), &st); err != nil {
+		err := unix.Statfs(filepath.Join(unifiedMountpoint, "unified"), &st)
+		if err != nil {
 			return cgMode
 		}
 		if st.Type == unix.CGROUP2_SUPER_MAGIC {
@@ -319,7 +327,6 @@ func Mode() CGMode {
 //	@Description: 检查此磁盘性能
 //	@param h
 func diskPerformance(ctx context.Context, h *types.Host, performanceDir string) error {
-	//drivePerfResult := new(dperf.DrivePerfResult)
 	// 默认值,防止空指针 panic
 	h.DrivePerfResult = make(map[string]*dperf.DrivePerfResult)
 	perf := &dperf.DrivePerf{

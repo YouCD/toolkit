@@ -46,7 +46,8 @@ func WriteSkipFileExist(fileName string, data []byte, perm os.FileMode) error {
 	if !errors.Is(err, os.ErrNotExist) {
 		return errors.WithMessagef(err, "文件存在: %s,err:%s", fileName, err.Error())
 	}
-	if err = os.WriteFile(fileName, data, perm); err != nil {
+	err = os.WriteFile(fileName, data, perm)
+	if err != nil {
 		return errors.WithMessagef(err, "写入文件失败: %s", fileName)
 	}
 	return nil
@@ -105,7 +106,8 @@ func WatchFS(ctx context.Context, watchSir, target string) (bool, error) {
 //	@return bool
 func Exists(path string) bool {
 	// os.Stat获取文件信息
-	if _, err := os.Stat(path); err != nil {
+	_, err := os.Stat(path)
+	if err != nil {
 		return os.IsExist(err)
 	}
 	return true
@@ -163,7 +165,8 @@ func Copy(src, dest string) error {
 
 	// 创建目标文件夹
 	destFolder := filepath.Dir(dest)
-	if err := os.MkdirAll(destFolder, os.ModePerm); err != nil {
+	err = os.MkdirAll(destFolder, os.ModePerm)
+	if err != nil {
 		return fmt.Errorf("创建目标文件夹失败,src:%s,dest:%s,err: %w", src, dest, err)
 	}
 
@@ -193,16 +196,19 @@ func Copy(src, dest string) error {
 		}
 
 		// 将缓冲区的数据写入目标文件
-		if _, err = destFile.Write(buffer[:bytesRead]); err != nil {
+		_, err = destFile.Write(buffer[:bytesRead])
+		if err != nil {
 			return fmt.Errorf("写入文件失败: %w", err)
 		}
 	}
 	// flush 到磁盘
-	if err := destFile.Sync(); err != nil {
+	err = destFile.Sync()
+	if err != nil {
 		return fmt.Errorf("文件同步失败: %w", err)
 	}
 	// 强制修改文件权限
-	if err = destFile.Chmod(stat.Mode()); err != nil {
+	err = destFile.Chmod(stat.Mode())
+	if err != nil {
 		return fmt.Errorf("修改文件权限失败: %w", err)
 	}
 
@@ -234,10 +240,12 @@ func CopyFolder(srcDir, dstDir string) error {
 	UID, GID := getFileUIDGID(sourceInfo)
 
 	// 创建目标目录
-	if err := os.MkdirAll(absDstDir, sourceInfo.Mode()); err != nil {
+	err = os.MkdirAll(absDstDir, sourceInfo.Mode())
+	if err != nil {
 		return fmt.Errorf("创建目标文件夹失败: %w", err)
 	}
-	if err := os.Chown(absDstDir, UID, GID); err != nil {
+	err = os.Chown(absDstDir, UID, GID)
+	if err != nil {
 		return fmt.Errorf("设置目标文件夹权限失败: %w", err)
 	}
 
@@ -262,11 +270,13 @@ func CopyFolder(srcDir, dstDir string) error {
 		destinationPath := filepath.Join(absDstDir, entry.Name())
 
 		if entry.IsDir() {
-			if err := CopyFolder(absSourcePath, destinationPath); err != nil {
+			err = CopyFolder(absSourcePath, destinationPath)
+			if err != nil {
 				return err
 			}
 		} else {
-			if err := Copy(absSourcePath, destinationPath); err != nil {
+			err = Copy(absSourcePath, destinationPath)
+			if err != nil {
 				return err
 			}
 		}
@@ -282,10 +292,12 @@ func CopyFolder(srcDir, dstDir string) error {
 //	@param destPath
 //	@return error
 func MoveFile(sourcePath, destPath string) error {
-	if err := Copy(sourcePath, destPath); err != nil {
+	err := Copy(sourcePath, destPath)
+	if err != nil {
 		return fmt.Errorf("移动文件失败: %w", err)
 	}
-	if err := os.Remove(sourcePath); err != nil {
+	err = os.Remove(sourcePath)
+	if err != nil {
 		return fmt.Errorf("删除源文件失败: %w", err)
 	}
 	return nil
@@ -307,7 +319,8 @@ func MoveDir(sourcePath, destPath string) error {
 	}
 
 	// Step 1: 拷贝（CopyFolder 已跳过 destPath）
-	if err := CopyFolder(absSource, absDest); err != nil {
+	err = CopyFolder(absSource, absDest)
+	if err != nil {
 		return fmt.Errorf("拷贝失败: %w", err)
 	}
 
@@ -328,7 +341,8 @@ func MoveDir(sourcePath, destPath string) error {
 			continue
 		}
 
-		if err := os.RemoveAll(absEntryPath); err != nil {
+		err = os.RemoveAll(absEntryPath)
+		if err != nil {
 			return fmt.Errorf("删除文件失败: %w", err)
 		}
 	}

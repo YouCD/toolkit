@@ -1,6 +1,9 @@
 package net
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestNMCli_SetNetWork(t *testing.T) {
 	N := &NMCli{}
@@ -8,7 +11,8 @@ func TestNMCli_SetNetWork(t *testing.T) {
 	dns := []string{"8.8.8.8", "223.5.5.5"}
 	gateway := "192.168.110.1"
 	cni := "ens192"
-	if err := N.SetNetWork(addresses, dns, gateway, cni); err != nil {
+	err := N.SetNetWork(context.TODO(), addresses, dns, gateway, cni)
+	if err != nil {
 		t.Errorf("SetNetWork() error = %v", err)
 	}
 }

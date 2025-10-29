@@ -19,31 +19,12 @@ var (
 type (
 	IPType int
 	IP     struct {
+		IPType
+
 		Address string `json:"address"`
 		Port    int    `json:"port"`
-		IPType
 	}
 )
-
-func (i *IP) String() string {
-	return i.Address
-}
-
-// FmtIP
-//
-//	@Description: 格式化输出ip地址，ipv6会加方括号
-//	@receiver i
-//	@return string
-func (i *IP) FmtIP() string {
-	switch i.IPType {
-	case IPTypeIPV6:
-		return fmt.Sprintf("[%s]", i.Address)
-	case IPTypeIPV4:
-		return i.Address
-	default:
-		return i.Address
-	}
-}
 
 // NewIP
 //
@@ -72,4 +53,24 @@ func NewIP(IPStr string, SSHPort int) (*IP, error) {
 		Port:    SSHPort,
 		IPType:  ipt,
 	}, nil
+}
+
+func (i *IP) String() string {
+	return i.Address
+}
+
+// FmtIP
+//
+//	@Description: 格式化输出ip地址，ipv6会加方括号
+//	@receiver i
+//	@return string
+func (i *IP) FmtIP() string {
+	switch i.IPType {
+	case IPTypeIPV6:
+		return fmt.Sprintf("[%s]", i.Address)
+	case IPTypeIPV4:
+		return i.Address
+	default:
+		return i.Address
+	}
 }

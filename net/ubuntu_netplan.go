@@ -1,6 +1,7 @@
 package net
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -58,7 +59,8 @@ type Netplan struct {
 func NewNetplan(configFile string) (*Netplan, error) {
 	netplan := new(Netplan)
 	netplan.ConfigFile = configFile
-	if err := netplan.ParserConfig(); err != nil {
+	err := netplan.ParserConfig()
+	if err != nil {
 		return nil, err
 	}
 
@@ -70,17 +72,18 @@ func NewNetplan(configFile string) (*Netplan, error) {
 //	@Description: 回滚
 //	@receiver n
 //	@return error
-func (n *Netplan) Rollback() error {
+func (n *Netplan) Rollback(ctx context.Context) error {
 	timeDirName := time.Now().Format("20060102")
 	backupFile := n.ConfigFile + "." + timeDirName
 	readFile, err := os.ReadFile(backupFile)
 	if err != nil {
 		return fmt.Errorf("read backupFile error: %w", err)
 	}
-	if err := os.WriteFile(n.ConfigFile, readFile, 0644); err != nil {
+	err = os.WriteFile(n.ConfigFile, readFile, 0644)
+	if err != nil {
 		return fmt.Errorf("write file error: %w", err)
 	}
-	return n.apply()
+	return n.apply(ctx)
 }
 
 // GetCNI
@@ -109,7 +112,8 @@ func (n *Netplan) ParserConfig() error {
 		return fmt.Errorf("read fileData error: %w", err)
 	}
 	var networkData NetworkObj
-	if err := yaml.Unmarshal(fileData, &networkData); err != nil {
+	err = yaml.Unmarshal(fileData, &networkData)
+	if err != nil {
 		return fmt.Errorf("unmarshal error: %w", err)
 	}
 	n.NetworkObj = &networkData
@@ -126,7 +130,7 @@ func (n *Netplan) ParserConfig() error {
 //	@param gateway
 //	@param cni
 //	@return error
-func (n *Netplan) SetNetWork(addresses, dns []string, gateway, cni string) error {
+func (n *Netplan) SetNetWork(ctx context.Context, addresses, dns []string, gateway, cni string) error {
 	// 1. 修改网卡配置
 	ethernet, ok := n.NetworkObj.Ethernets[cni]
 	if !ok {
@@ -152,11 +156,12 @@ func (n *Netplan) SetNetWork(addresses, dns []string, gateway, cni string) error
 	if err != nil {
 		return fmt.Errorf("yaml.marshal error: %w", err)
 	}
-	if err := os.WriteFile(n.ConfigFile, out, 0644); err != nil {
+	err = os.WriteFile(n.ConfigFile, out, 0644)
+	if err != nil {
 		return fmt.Errorf("write file , file: %s ,error: %w", n.ConfigFile, err)
 	}
 	// 4. 应用配置
-	return n.apply()
+	return n.apply(ctx)
 }
 
 // apply
@@ -164,13 +169,13 @@ func (n *Netplan) SetNetWork(addresses, dns []string, gateway, cni string) error
 //	@Description: 应用
 //	@receiver n
 //	@return error
-func (n *Netplan) apply() error {
+func (n *Netplan) apply(ctx context.Context) error {
 	cmdStr := "netplan apply"
-	return bash(cmdStr)
+	return bash(ctx, cmdStr)
 }
 
-func bash(cmdStr string) error {
-	command := exec.Command("bash", "-c", cmdStr)
+func bash(ctx context.Context, cmdStr string) error {
+	command := exec.CommandContext(ctx, "bash", "-c", cmdStr)
 	command.Env = append(command.Environ(), "LANG=en_US.utf8", "LANGUAGE=en_US.utf8")
 	output, err := command.CombinedOutput()
 	if err != nil {

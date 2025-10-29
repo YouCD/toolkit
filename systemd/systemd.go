@@ -66,58 +66,6 @@ func NewSystemd(ctx context.Context, connectionStateChan chan ConnectionState, m
 	return s, nil
 }
 
-// guardConnected
-//
-//	@Description:疯狂连接
-//	@receiver s
-func (s *Systemd) guardConnected(ctx context.Context) {
-	retryInterval := time.Second
-	for {
-		select {
-		case <-ctx.Done():
-			return // context canceled, exit the loop
-		default:
-			//nolint:nestif
-			if s.conn == nil || !s.conn.Connected() {
-				s.mux.Lock()
-				s.totalConnect++
-				s.mux.Unlock()
-
-				conn, err := dbus.NewSystemdConnectionContext(ctx)
-				if err != nil {
-					// 连接失败，通过通道向调用者发送状态信息
-					if s.connectionStateChan != nil {
-						s.connectionStateChan <- ConnectionState{
-							Connected:     false,
-							TotalAttempts: s.totalConnect,
-							Err:           err,
-						}
-					}
-					// 指数回退策略
-					time.Sleep(retryInterval)
-					retryInterval *= 2
-					if retryInterval > time.Minute {
-						retryInterval = time.Minute // 限制最大重试间隔
-					}
-					continue
-				}
-				s.conn = conn
-				if s.connectionStateChan != nil {
-					s.connectionStateChan <- ConnectionState{
-						Connected:     true,
-						TotalAttempts: s.totalConnect,
-					}
-				}
-				// 连接成功后重置重试间隔
-				retryInterval = time.Second
-			} else {
-				// 连接正常时睡眠一段时间，避免占用CPU
-				time.Sleep(time.Second * 10)
-			}
-		}
-	}
-}
-
 // UnitStart
 //
 //	@Description: systemctl enable --now 服务；会在300s内检查服务
@@ -128,10 +76,11 @@ func (s *Systemd) UnitStart(ctx context.Context, service string) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	s.unitCurrent = service
-	if err := s.DaemonReload(ctx); err != nil {
+	err := s.DaemonReload(ctx)
+	if err != nil {
 		errs = append(errs, err)
 	}
-	_, err := s.conn.StartUnitContext(ctx, service, "replace", s.dbusMsgChan)
+	_, err = s.conn.StartUnitContext(ctx, service, "replace", s.dbusMsgChan)
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -166,23 +115,14 @@ func (s *Systemd) EnableService(ctx context.Context, services ...string) error {
 //	@param service
 //	@return error
 func (s *Systemd) UnitStartWithEnable(ctx context.Context, service string) error {
-	if err := s.UnitStart(ctx, service); err != nil {
+	err := s.UnitStart(ctx, service)
+	if err != nil {
 		return fmt.Errorf("start service %s, error:%w", service, err)
 	}
 	// enable
 	return s.EnableService(ctx, service)
 }
 
-func (s *Systemd) handlerMsgChan() {
-	for msg := range s.dbusMsgChan {
-		if s.MsgChan != nil {
-			s.MsgChan <- Msg{
-				UnitName: s.unitCurrent,
-				MsgStr:   msg,
-			}
-		}
-	}
-}
 func (s *Systemd) Close() error {
 	close(s.dbusMsgChan)
 	s.conn.Close()
@@ -199,54 +139,14 @@ func (s *Systemd) UnitRestart(ctx context.Context, service string) error {
 	defer s.mux.Unlock()
 	s.unitCurrent = service
 
-	if _, err := s.conn.RestartUnitContext(ctx, service, "replace", s.dbusMsgChan); err != nil {
+	_, err := s.conn.RestartUnitContext(ctx, service, "replace", s.dbusMsgChan)
+	if err != nil {
 		return fmt.Errorf("restart service %s, error:%w", service, err)
 	}
 
 	time.Sleep(time.Second * 3)
 
 	return s.unitCheck(ctx, service)
-}
-
-// unitCheck
-//
-//	@Description: 检查服务
-//	@param service
-//	@return error
-func (s *Systemd) unitCheck(ctx context.Context, service string) error {
-	// 2 状态检查  ActiveState
-	tick := time.NewTicker(time.Second * 300)
-	defer tick.Stop()
-	count := 0
-	for {
-		select {
-		case <-tick.C:
-			return fmt.Errorf("服务: %s  检查超时. err:%w", service, ErrTimeout)
-		default:
-			count++
-			if s.unitCheckChan != nil {
-				s.unitCheckChan <- UnitCheck{
-					UnitName:   service,
-					CheckCount: count,
-				}
-			}
-
-			someProperty, err := s.UnitSomeProperty(ctx, service, "ActiveState")
-			if err != nil {
-				return fmt.Errorf("service: %s, error: %w", service, err)
-			}
-			if someProperty == "active" {
-				return nil
-			}
-
-			// 如果没有启动
-			if someProperty != "active" {
-				_, _ = s.conn.StartUnitContext(ctx, service, "replace", s.dbusMsgChan)
-				time.Sleep(5 * time.Second)
-				continue
-			}
-		}
-	}
 }
 
 // UnitFragmentPath
@@ -327,12 +227,14 @@ func (s *Systemd) UnitDisableAndMask(ctx context.Context, services ...string) er
 	var errs []error
 	// stop
 	for _, service := range services {
-		if err := s.UnitStop(ctx, service); err != nil {
+		err := s.UnitStop(ctx, service)
+		if err != nil {
 			errs = append(errs, fmt.Errorf("停止失败: %s, err: %w", service, err))
 		}
 	}
 
-	if _, err := s.conn.DisableUnitFilesContext(ctx, services, false); err != nil {
+	_, err := s.conn.DisableUnitFilesContext(ctx, services, false)
+	if err != nil {
 		return fmt.Errorf("systemctl disable %s err: %w", services, err)
 	}
 	errs = append(errs, s.UnitMask(ctx, services...))
@@ -347,16 +249,19 @@ func (s *Systemd) UnitStopDisable(ctx context.Context, services ...string) error
 	var errs []error
 	// stop
 	for _, service := range services {
-		if err := s.UnitStop(ctx, service); err != nil {
+		err := s.UnitStop(ctx, service)
+		if err != nil {
 			errs = append(errs, fmt.Errorf("停止失败: %s, err: %w", service, err))
 		}
 	}
 
 	// disable
-	if _, err := s.conn.DisableUnitFilesContext(ctx, services, false); err != nil {
+	_, err := s.conn.DisableUnitFilesContext(ctx, services, false)
+	if err != nil {
 		errs = append(errs, fmt.Errorf("关闭失败: %s, err: %w", strings.Join(services, ","), err))
 	}
-	if _, err := s.conn.DisableUnitFilesContext(ctx, services, false); err != nil {
+	_, err = s.conn.DisableUnitFilesContext(ctx, services, false)
+	if err != nil {
 		return fmt.Errorf("关闭失败: %s, err: %w", strings.Join(services, ","), err)
 	}
 	if len(errs) > 0 {
@@ -366,7 +271,8 @@ func (s *Systemd) UnitStopDisable(ctx context.Context, services ...string) error
 }
 
 func (s *Systemd) UnitMask(ctx context.Context, services ...string) error {
-	if _, err := s.conn.MaskUnitFilesContext(ctx, services, false, true); err != nil {
+	_, err := s.conn.MaskUnitFilesContext(ctx, services, false, true)
+	if err != nil {
 		return fmt.Errorf("mask 失败: %s, err: %w", strings.Join(services, ","), err)
 	}
 	return nil
@@ -377,7 +283,8 @@ func (s *Systemd) UnitStop(ctx context.Context, service string) error {
 	defer s.mux.Unlock()
 	s.unitCurrent = service
 
-	if _, err := s.conn.StopUnitContext(ctx, service, "replace", s.dbusMsgChan); err != nil {
+	_, err := s.conn.StopUnitContext(ctx, service, "replace", s.dbusMsgChan)
+	if err != nil {
 		return fmt.Errorf("停止失败: %s, err: %w", service, err)
 	}
 
@@ -385,7 +292,8 @@ func (s *Systemd) UnitStop(ctx context.Context, service string) error {
 }
 
 func (s *Systemd) DaemonReload(ctx context.Context) error {
-	if err := s.conn.ReloadContext(ctx); err != nil {
+	err := s.conn.ReloadContext(ctx)
+	if err != nil {
 		return fmt.Errorf("reload失败, err: %w", err)
 	}
 	return nil
@@ -412,4 +320,107 @@ func (s *Systemd) UnitListFilterByName(ctx context.Context, service string) (*db
 		}
 	}
 	return nil, ErrServiceNotExist
+}
+
+// guardConnected
+//
+//	@Description:疯狂连接
+//	@receiver s
+func (s *Systemd) guardConnected(ctx context.Context) {
+	retryInterval := time.Second
+	for {
+		select {
+		case <-ctx.Done():
+			return // context canceled, exit the loop
+		default:
+			//nolint:nestif
+			if s.conn == nil || !s.conn.Connected() {
+				s.mux.Lock()
+				s.totalConnect++
+				s.mux.Unlock()
+
+				conn, err := dbus.NewSystemdConnectionContext(ctx)
+				if err != nil {
+					// 连接失败，通过通道向调用者发送状态信息
+					if s.connectionStateChan != nil {
+						s.connectionStateChan <- ConnectionState{
+							Connected:     false,
+							TotalAttempts: s.totalConnect,
+							Err:           err,
+						}
+					}
+					// 指数回退策略
+					time.Sleep(retryInterval)
+					retryInterval *= 2
+					if retryInterval > time.Minute {
+						retryInterval = time.Minute // 限制最大重试间隔
+					}
+					continue
+				}
+				s.conn = conn
+				if s.connectionStateChan != nil {
+					s.connectionStateChan <- ConnectionState{
+						Connected:     true,
+						TotalAttempts: s.totalConnect,
+					}
+				}
+				// 连接成功后重置重试间隔
+				retryInterval = time.Second
+			} else {
+				// 连接正常时睡眠一段时间，避免占用CPU
+				time.Sleep(time.Second * 10)
+			}
+		}
+	}
+}
+
+// unitCheck
+//
+//	@Description: 检查服务
+//	@param service
+//	@return error
+func (s *Systemd) unitCheck(ctx context.Context, service string) error {
+	// 2 状态检查  ActiveState
+	tick := time.NewTicker(time.Second * 300)
+	defer tick.Stop()
+	count := 0
+	for {
+		select {
+		case <-tick.C:
+			return fmt.Errorf("服务: %s  检查超时. err:%w", service, ErrTimeout)
+		default:
+			count++
+			if s.unitCheckChan != nil {
+				s.unitCheckChan <- UnitCheck{
+					UnitName:   service,
+					CheckCount: count,
+				}
+			}
+
+			someProperty, err := s.UnitSomeProperty(ctx, service, "ActiveState")
+			if err != nil {
+				return fmt.Errorf("service: %s, error: %w", service, err)
+			}
+			if someProperty == "active" {
+				return nil
+			}
+
+			// 如果没有启动
+			if someProperty != "active" {
+				_, _ = s.conn.StartUnitContext(ctx, service, "replace", s.dbusMsgChan)
+				time.Sleep(5 * time.Second)
+				continue
+			}
+		}
+	}
+}
+func (s *Systemd) handlerMsgChan() {
+	for msg := range s.dbusMsgChan {
+		if s.MsgChan != nil {
+			s.MsgChan <- Msg{
+				UnitName: s.unitCurrent,
+				MsgStr:   msg,
+			}
+		}
+	}
 }

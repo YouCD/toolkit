@@ -134,7 +134,8 @@ func Write2TarballFile(outputFilePath string, renameRegistry renameFunc, imageNa
 		imgMap[newName] = img
 	}
 
-	if err := crane.MultiSave(imgMap, outputFilePath); err != nil {
+	err := crane.MultiSave(imgMap, outputFilePath)
+	if err != nil {
 		errs = append(errs, err)
 	}
 
@@ -267,5 +268,6 @@ func ImageTag(tarballFilePath string) ([]string, error) {
 		}
 		return descriptor.RepoTags, nil
 	}
+	//nolint:err113
 	return nil, errors.New("未找到镜像标签")
 }

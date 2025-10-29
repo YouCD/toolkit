@@ -6,7 +6,8 @@ import (
 )
 
 func TestTarDirWithDirFunc(t *testing.T) {
-	if err := GzOrZstFileWithDirFunc("/home/ycd/fireCloud/source_code/ssc_cd/data", "/tmp/os_repo.tar.zst", nil); err != nil {
+	err := GzOrZstFileWithDirFunc("/home/ycd/fireCloud/source_code/ssc_cd/data", "/tmp/os_repo.tar.zst", nil)
+	if err != nil {
 		t.Error(err)
 	}
 }
