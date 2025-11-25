@@ -24,4 +24,9 @@ func RegisterHandlers(h func(pattern string, handler func(http.ResponseWriter, *
 	h("/debug/pprof/profile", pprof.Profile)
 	h("/debug/pprof/symbol", pprof.Symbol)
 	h("/debug/pprof/trace", pprof.Trace)
+	h("/debug/pprof/allocs", pprof.Handler("allocs").ServeHTTP)
+	h("/debug/pprof/heap", pprof.Handler("heap").ServeHTTP)
+	h("/debug/pprof/goroutine", pprof.Handler("goroutine").ServeHTTP)
+	h("/debug/pprof/block", pprof.Handler("block").ServeHTTP)
+	h("/debug/pprof/threadcreate", pprof.Handler("threadcreate").ServeHTTP)
 }
