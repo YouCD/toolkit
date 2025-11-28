@@ -2,9 +2,11 @@ package log
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/natefinch/lumberjack"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -68,7 +70,7 @@ func Init(cfg *Config) {
 		cfg = defaultConfig
 	}
 	core := newCore(cfg)
-	l := zap.New(core, zap.AddCaller(), zap.AddCallerSkip(1), zap.Development())
+	l := zap.New(core, zap.AddCaller(), zap.Development())
 	logger = l.Sugar()
 	setLogLevel()
 }
@@ -78,7 +80,7 @@ func InitBuffer(logBuffer *bytes.Buffer) {
 		zapcore.NewMultiWriteSyncer(zapcore.AddSync(logBuffer), zapcore.AddSync(os.Stdout)), // 打印到控制台和文件
 		atomicLevel, // 日志级别
 	)
-	l := zap.New(core, zap.AddCaller(), zap.AddCallerSkip(1), zap.Development())
+	l := zap.New(core, zap.AddCaller(), zap.Development())
 	logger = l.Sugar()
 	setLogLevel()
 }
@@ -138,96 +140,29 @@ func GetLogFile() string {
 	return "no file"
 }
 
-func Debug(args ...interface{}) {
-	if logger != nil {
-		logger.Debug(args...)
-	}
-}
-
-func Debugf(template string, args ...interface{}) {
-	if logger != nil {
-		logger.Debugf(template, args...)
-	}
-}
-
-func Debugw(msg string, keysAndValues ...interface{}) {
-	if logger != nil {
-		logger.Debugw(msg, keysAndValues...)
-	}
-}
-
-func Info(args ...interface{}) {
-	if logger != nil {
-		logger.Info(args...)
-	}
-}
-
-func Infof(template string, args ...interface{}) {
-	if logger != nil {
-		logger.Infof(template, args...)
-	}
-}
-
-func Infow(msg string, keysAndValues ...interface{}) {
-	if logger != nil {
-		logger.Infow(msg, keysAndValues...)
-	}
-}
-
-func Warn(args ...interface{}) {
-	if logger != nil {
-		logger.Warn(args...)
-	}
-}
-
-func Warnf(template string, args ...interface{}) {
-	if logger != nil {
-		logger.Warnf(template, args...)
-	}
-}
-
-func Warnw(msg string, keysAndValues ...interface{}) {
-	if logger != nil {
-		logger.Warnw(msg, keysAndValues...)
-	}
-}
-
-func Error(args ...interface{}) {
-	if logger != nil {
-		logger.Error(args...)
-	}
-}
-
-func Errorf(template string, args ...interface{}) {
-	if logger != nil {
-		logger.Errorf(template, args...)
-	}
-}
-
-func Errorw(msg string, keysAndValues ...interface{}) {
-	if logger != nil {
-		logger.Errorw(msg, keysAndValues...)
-	}
-}
-
-func Panic(args ...interface{}) {
-	if logger != nil {
-		logger.Panic(args...)
-	}
-}
-
-func Panicf(template string, args ...interface{}) {
-	if logger != nil {
-		logger.Panicf(template, args...)
-	}
-}
-
-func Panicw(msg string, keysAndValues ...interface{}) {
-	if logger != nil {
-		logger.Panicw(msg, keysAndValues...)
-	}
-}
-
 func GetLogger() *zap.SugaredLogger {
 	return logger
+}
+
+// WithCtx 返回一个带有 request_id 的 SugaredLogger
+// 注意: 返回的 logger 会继承全局 logger 的 callerSkip 设置
+// 在热路径上建议缓存结果: l := log.WithCtx(ctx); l.Info(...)
+func WithCtx(ctx context.Context) *zap.SugaredLogger {
+	if logger == nil {
+		return nil
+	}
+	var requestId string
+
+	if id, ok := ctx.Value("request_id").(string); ok && id != "" {
+		requestId = id
+	}
+	if requestId != "" {
+		return logger.With("request_id", requestId)
+	}
+	return logger
+}
+
+func SetRequestId(ctx context.Context) context.Context {
+	ctx = context.WithValue(ctx, "request_id", uuid.New().String())
+	return ctx
 }
