@@ -27,6 +27,7 @@ var (
 	defaultConfig = &Config{
 		Stdout: true,
 	}
+	defaultLogger = zap.New(newCore(defaultConfig), zap.AddCaller(), zap.Development()).Sugar()
 )
 var (
 	lumberjackLogger *lumberjack.Logger
@@ -148,9 +149,6 @@ func GetLogger() *zap.SugaredLogger {
 // 注意: 返回的 logger 会继承全局 logger 的 callerSkip 设置
 // 在热路径上建议缓存结果: l := log.WithCtx(ctx); l.Info(...)
 func WithCtx(ctx context.Context) *zap.SugaredLogger {
-	if logger == nil {
-		return nil
-	}
 	var requestId string
 
 	if id, ok := ctx.Value("request_id").(string); ok && id != "" {
@@ -158,6 +156,9 @@ func WithCtx(ctx context.Context) *zap.SugaredLogger {
 	}
 	if requestId != "" {
 		return logger.With("request_id", requestId)
+	}
+	if logger == nil {
+		return defaultLogger
 	}
 	return logger
 }
