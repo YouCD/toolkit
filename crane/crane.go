@@ -271,3 +271,12 @@ func ImageTag(tarballFilePath string) ([]string, error) {
 	//nolint:err113
 	return nil, errors.New("未找到镜像标签")
 }
+
+// CountImagesFromTarballFile 获取 tarball 文件中的镜像数量
+func CountImagesFromTarballFile(tarballFilePath string) (int, error) {
+	manifest, err := tarball.LoadManifest(pathOpener(tarballFilePath))
+	if err != nil {
+		return 0, fmt.Errorf("错误：无法从 tarball 文件中读取清单,err: %w", err)
+	}
+	return len(manifest), err
+}
