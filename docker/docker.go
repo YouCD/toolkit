@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/loader"
 	types2 "github.com/compose-spec/compose-go/v2/types"
 	"github.com/distribution/reference"
 	"github.com/docker/buildx/driver"
@@ -825,6 +826,7 @@ func ComposeYamlRead(ctx context.Context, file string, envFiles ...string) (*typ
 		cli.WithConsistency(false),
 		cli.WithEnvFiles(envFiles...),
 		cli.WithDotEnv,
+		cli.WithLoadOptions(loader.WithSkipValidation),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("NewProjectOptions() err:%w", err)
