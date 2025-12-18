@@ -1,9 +1,12 @@
 package crane
 
 import (
+	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path"
 	"sync"
@@ -17,6 +20,9 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 )
 
+var (
+	ErrBadName = errors.New("镜像名称错误")
+)
 var defaultPlatform = v1.Platform{
 	Architecture: "amd64",
 	OS:           "linux",
@@ -279,4 +285,37 @@ func CountImagesFromTarballFile(tarballFilePath string) (int, error) {
 		return 0, fmt.Errorf("错误：无法从 tarball 文件中读取清单,err: %w", err)
 	}
 	return len(manifest), err
+}
+
+// LoadImageFromRemote 从远程仓库下载镜像
+func LoadImageFromRemote(ctx context.Context, username, password, image string) error {
+	sourceImageRef, err := name.ParseReference(image)
+	if err != nil {
+		return fmt.Errorf("错误：无法解析源镜像引用,err: %w", ErrBadName)
+	}
+
+	// 创建一个自定义的Transport，并禁用证书验证
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			//nolint:gosec
+			InsecureSkipVerify: true,
+		},
+	}
+
+	opts := []remote.Option{
+		remote.WithAuth(&authn.Basic{Username: username, Password: password}),
+		remote.WithTransport(tr),
+		remote.WithContext(ctx),
+	}
+	remoteImg, err := remote.Image(sourceImageRef, opts...)
+	if err != nil {
+		return fmt.Errorf("错误：无法从远程仓库下载镜像,err: %w", err)
+	}
+	//nolint:forcetypeassert
+	tag := sourceImageRef.(name.Tag)
+	_, err = daemon.Write(tag, remoteImg)
+	if err != nil {
+		return fmt.Errorf("错误：无法将镜像写入本地镜像仓库,err: %w", err)
+	}
+	return nil
 }

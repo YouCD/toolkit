@@ -125,6 +125,7 @@ func (b *Bar) StopStartBar(barName string) {
 //nolint:forcetypeassert
 func (b *Bar) Stop() {
 	msg := make([]string, 0)
+	//nolint:modernize
 	b.event.Range(func(key, value interface{}) bool {
 		if value == StateFail {
 			msg = append(msg, fmt.Sprintf("%s:%s", key.(string), value))

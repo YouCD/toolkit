@@ -1,6 +1,7 @@
 package log
 
 import (
+	"context"
 	"testing"
 )
 
@@ -16,6 +17,11 @@ func TestSetLogLevel(t *testing.T) {
 		//	LocalTime:  true,
 		//},
 	}
-	Init(cfg)
-	Info("hello world")
+	Init(nil)
+	WithCtx(context.Background()).Info("Info")
+	SetLogLevel("debug")
+	WithCtx(context.Background()).Debug("Debug")
+	SetLogLevel("info")
+	WithCtx(context.Background()).Debug("Debug")
+	WithCtx(context.Background()).Info("Info")
 }
