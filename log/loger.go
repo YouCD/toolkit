@@ -154,11 +154,11 @@ func WithCtx(ctx context.Context) *zap.SugaredLogger {
 	if id, ok := ctx.Value("request_id").(string); ok && id != "" {
 		requestId = id
 	}
-	if requestId != "" {
-		return logger.With("request_id", requestId)
-	}
 	if logger == nil {
 		return defaultLogger
+	}
+	if requestId != "" {
+		return logger.With("request_id", requestId)
 	}
 	return logger
 }
