@@ -36,7 +36,7 @@ var defaultPlatform = v1.Platform{
 func DefaultOpt(arch string) []remote.Option {
 	var platform = defaultPlatform
 	platform.Architecture = arch
-	var opt []remote.Option
+	opt := make([]remote.Option, 0, 2)
 	opt = append(opt,
 		remote.WithAuthFromKeychain(authn.DefaultKeychain),
 		remote.WithPlatform(platform))

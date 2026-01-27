@@ -47,7 +47,9 @@ var (
 	ErrNetworkNotExist              = errors.New("docker network not exist")
 	ErrNoYaml                       = errors.New("没有找到ymal文件")
 	ErrSubnetGateway                = errors.New("docker.subnet.gateway 未找到")
+	ErrSubnetCIDR                   = errors.New("docker.subnet.cidr 未找到")
 )
+
 var (
 	d *Docker
 )
@@ -403,7 +405,7 @@ func (d *Docker) ContainerUpdateImage(ctx context.Context, containerName string,
 //	@param networkingConfig
 //	@return container.CreateResponse
 //	@return error
-func (d *Docker) ContainerCreate(ctx context.Context, containerName string, inspectJSON *types.ContainerJSON, networkingConfig *network.NetworkingConfig) (container.CreateResponse, error) {
+func (d *Docker) ContainerCreate(ctx context.Context, containerName string, inspectJSON *container.InspectResponse, networkingConfig *network.NetworkingConfig) (container.CreateResponse, error) {
 	resp, err := d.DockerCLIClient.Client().ContainerCreate(ctx,
 		inspectJSON.Config,
 		inspectJSON.HostConfig, networkingConfig, nil, containerName)
@@ -435,14 +437,26 @@ func (d *Docker) ContainerIsExits(ctx context.Context, containerName string) boo
 //	@Description: docker inspect 容器
 //	@receiver d
 //	@param containerName
-//	@return *types.ContainerJSON
+//	@return *container.InspectResponse
 //	@return error
-func (d *Docker) Inspect(ctx context.Context, containerName string) (*types.ContainerJSON, error) {
+func (d *Docker) Inspect(ctx context.Context, containerName string) (*container.InspectResponse, error) {
 	inspect, err := d.DockerCLIClient.Client().ContainerInspect(ctx, containerName)
 	if err != nil {
 		return nil, fmt.Errorf("%s :inspect error,err: %w", containerName, err)
 	}
 	return &inspect, nil
+}
+
+// ContainerIP 获取容器IP
+func (d *Docker) ContainerIP(ctx context.Context, containerName, subnetName string) (string, error) {
+	inspect, err := d.Inspect(ctx, containerName)
+	if err != nil {
+		return "", fmt.Errorf("%s :inspect error,err: %w", containerName, err)
+	}
+	if ins, ok := inspect.NetworkSettings.Networks[subnetName]; ok {
+		return ins.IPAddress, nil
+	}
+	return "", ErrSubnetCIDR
 }
 
 // ContainerRemove
@@ -512,7 +526,7 @@ func (d *Docker) CreateRegistry(ctx context.Context, imageName, repoPath, hostPo
 		return fmt.Errorf("创建挂载目录 error: %w", err)
 	}
 	// 文件挂载
-	m := make([]mount.Mount, 0)
+	m := make([]mount.Mount, 0, 1)
 	m = append(m, mount.Mount{Type: mount.TypeBind, Source: repoPath, Target: "/var/lib/registry"})
 
 	exports := make(nat.PortSet)
