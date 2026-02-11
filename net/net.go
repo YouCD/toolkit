@@ -184,3 +184,31 @@ func SSHPort() int {
 	}
 	return 0
 }
+
+// GetDefaultGatewayInterface 获取默认路由的出口IP
+func GetDefaultGatewayInterface() (string, error) {
+	// 获取默认路由
+	routes, err := netlink.RouteList(nil, netlink.FAMILY_V4)
+	if err != nil {
+		return "", fmt.Errorf("netlink.RouteList() : %w", err)
+	}
+	var index int
+	// 查找默认路由（目标为0.0.0.0/0）
+	for _, route := range routes {
+		if route.Dst.String() == "0.0.0.0/0" {
+			index = route.LinkIndex
+			break
+		}
+	}
+
+	link, err := netlink.LinkByIndex(index)
+	if err != nil {
+		return "", fmt.Errorf("netlink.LinkByIndex() : %w", err)
+	}
+
+	addrList, err := netlink.AddrList(link, netlink.FAMILY_V4)
+	if err != nil {
+		return "", fmt.Errorf("netlink.AddrList() : %w", err)
+	}
+	return addrList[0].IP.String(), nil
+}
