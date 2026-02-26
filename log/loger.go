@@ -167,3 +167,10 @@ func SetRequestId(ctx context.Context) context.Context {
 	ctx = context.WithValue(ctx, "request_id", uuid.New().String())
 	return ctx
 }
+
+// WithCtxSkip 提供自定义 caller 层级跳过，解决封装导致的行号错误
+func WithCtxSkip(ctx context.Context, skip int) *zap.SugaredLogger {
+	l := WithCtx(ctx)
+	// Desugar 之后增加 Skip，再 Sugar 回来
+	return l.Desugar().WithOptions(zap.AddCallerSkip(skip)).Sugar()
+}
