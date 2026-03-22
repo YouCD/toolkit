@@ -123,6 +123,7 @@ func ExtractTarZstOrGzipFile(src, dest string, progressChan chan string) error {
 	}
 	return nil
 }
+
 func pushMsg(progress Progress, progressChan chan string) {
 	if progressChan == nil {
 		return
@@ -169,7 +170,7 @@ func GzOrZstFileWithDirFunc(src, dst string, dirFunc dirFunc) error {
 		return nil
 	}
 	// 创建文件
-	fileHandle, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY, 0644)
+	fileHandle, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return fmt.Errorf("打开文件失败: %s,err：%w", dst, err)
 	}

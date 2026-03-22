@@ -17,7 +17,7 @@ func TestDirRowWithDirFunc(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	err = os.WriteFile("/tmp/os_repo.tar.gz", bytes, 0644)
+	err = os.WriteFile("/tmp/os_repo.tar.gz", bytes, 0o644)
 	if err != nil {
 		t.Error(err)
 	}
@@ -25,7 +25,7 @@ func TestDirRowWithDirFunc(t *testing.T) {
 
 func TestFileWithFunc(t *testing.T) {
 	sysinfoData, err := FileWithFunc("/home/ycd/self_data/source_code/go-source/shuttle/internal/shuttle/stage/check/sysinfo", nil)
-	err = os.WriteFile("/tmp/sysinfo.tar.gz", sysinfoData, 0644)
+	err = os.WriteFile("/tmp/sysinfo.tar.gz", sysinfoData, 0o644)
 	if err != nil {
 		t.Error(err)
 	}

@@ -6,8 +6,7 @@ import (
 	"strings"
 )
 
-type NMCli struct {
-}
+type NMCli struct{}
 
 func NewNMcli() *NMCli {
 	return &NMCli{}

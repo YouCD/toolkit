@@ -29,8 +29,8 @@ func Test_sse(t *testing.T) {
 	defer close(msgChan)
 	go func() {
 		for {
-			//io.C
-			//fmt.Println("内容：  ", string(log.LogBuffer))
+			// io.C
+			// fmt.Println("内容：  ", string(log.LogBuffer))
 			line, err := buffer.ReadString('\n')
 			if err != nil && !errors.Is(io.EOF, err) {
 				log.Errorf("read error: %s", err)
@@ -47,8 +47,8 @@ func Test_sse(t *testing.T) {
 			//}
 
 			fmt.Println("Cap  ", buffer.Cap())
-			//fmt.Println("内容：  ", log.LogBuffer.String())
-			//msgChan <- string(r)
+			// fmt.Println("内容：  ", log.LogBuffer.String())
+			// msgChan <- string(r)
 		}
 	}()
 	Sse(msgChan)

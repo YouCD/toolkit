@@ -414,6 +414,7 @@ func (s *Systemd) unitCheck(ctx context.Context, service string) error {
 		}
 	}
 }
+
 func (s *Systemd) handlerMsgChan() {
 	for msg := range s.dbusMsgChan {
 		if s.MsgChan != nil {

@@ -46,5 +46,4 @@ func TestNewSystemd(t *testing.T) {
 	if err != nil {
 		fmt.Println("err               ", err)
 	}
-
 }

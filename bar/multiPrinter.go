@@ -33,6 +33,7 @@ type MultiPrinter struct {
 func (p *MultiPrinter) AddBuffer(buffer *bytes.Buffer) {
 	p.buffers = append(p.buffers, buffer)
 }
+
 func (p *MultiPrinter) UpdateText(text string) {
 	// pterm.Fprinto(p.Writer, s.Style.Sprint(s.currentSequence)+" "+s.MessageStyle.Sprint(s.Text))
 	pterm.Fprintln(p.Writer, text)

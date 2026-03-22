@@ -30,6 +30,7 @@ var (
 	pwd string
 	wg  sync.WaitGroup
 )
+
 var (
 	ErrInstallDirIsNotDir = errors.New("安装目录不是目录")
 	ErrMkDirInstallDir    = errors.New("创建安装目录失败")

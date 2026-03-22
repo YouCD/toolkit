@@ -18,6 +18,7 @@ func Pprof(addr string) {
 		log.Fatal(err)
 	}
 }
+
 func RegisterHandlers(h func(pattern string, handler func(http.ResponseWriter, *http.Request))) {
 	h("/debug/pprof/", pprof.Index)
 	h("/debug/pprof/cmdline", pprof.Cmdline)

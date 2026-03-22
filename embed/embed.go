@@ -44,7 +44,7 @@ func (e *Embed) EmbedDataMetaInfo(filename string) (fs.FileInfo, error) {
 //	@param skipFileFunc
 //	@return error
 func (e *Embed) CopyEmbedDataFolderWithSkipFileFunc(embedSrcDir, dstDir string, skipFileFunc func(filename string) bool) error {
-	err := os.MkdirAll(dstDir, 0755)
+	err := os.MkdirAll(dstDir, 0o755)
 	if err != nil {
 		return fmt.Errorf("创建目标文件夹失败: %w", err)
 	}
@@ -99,7 +99,7 @@ func (e *Embed) CopyEmbedDataFolderWithSkipFileFunc(embedSrcDir, dstDir string, 
 //	@param dstFile
 //	@return error
 func (e *Embed) CopyEmbedDataFile(embedSrcFile, dstFile string) error {
-	err := os.MkdirAll(filepath.Dir(dstFile), 0755)
+	err := os.MkdirAll(filepath.Dir(dstFile), 0o755)
 	if err != nil {
 		return fmt.Errorf("创建目标文件夹失败: %w", err)
 	}

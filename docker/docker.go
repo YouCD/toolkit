@@ -50,9 +50,7 @@ var (
 	ErrSubnetCIDR                   = errors.New("docker.subnet.cidr 未找到")
 )
 
-var (
-	d *Docker
-)
+var d *Docker
 
 type Docker struct {
 	ComposeService  api.Service
@@ -521,7 +519,7 @@ func (d *Docker) CreateRegistry(ctx context.Context, imageName, repoPath, hostPo
 		}
 	}
 
-	err := os.MkdirAll(repoPath, 0755)
+	err := os.MkdirAll(repoPath, 0o755)
 	if err != nil {
 		return fmt.Errorf("创建挂载目录 error: %w", err)
 	}
@@ -548,7 +546,7 @@ func (d *Docker) CreateRegistry(ctx context.Context, imageName, repoPath, hostPo
 		&container.Config{
 			Image:        registryName,
 			ExposedPorts: exports,
-			//Cmd:          cmd,
+			// Cmd:          cmd,
 			Tty: false,
 			// WorkingDir:   workDir,
 		},
@@ -557,7 +555,6 @@ func (d *Docker) CreateRegistry(ctx context.Context, imageName, repoPath, hostPo
 			Mounts:       m,
 			AutoRemove:   true, // 自动删除
 		}, nil, nil, registryName)
-
 	if err != nil {
 		return fmt.Errorf("registry创建 error: %w", err)
 	}
@@ -724,9 +721,9 @@ func (d *Docker) ComposeServiceUp(ctx context.Context, p *types2.Project, recrea
 func (d *Docker) ComposeServiceRestart(ctx context.Context, p *types2.Project) error {
 	Opts := api.RestartOptions{
 		Project: p,
-		//Timeout:  nil,
-		//Services: nil,
-		//NoDeps:   false,
+		// Timeout:  nil,
+		// Services: nil,
+		// NoDeps:   false,
 	}
 
 	err := d.ComposeService.Restart(ctx, p.Name, Opts)

@@ -79,7 +79,7 @@ func (n *Netplan) Rollback(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("read backupFile error: %w", err)
 	}
-	err = os.WriteFile(n.ConfigFile, readFile, 0644)
+	err = os.WriteFile(n.ConfigFile, readFile, 0o644)
 	if err != nil {
 		return fmt.Errorf("write file error: %w", err)
 	}
@@ -145,7 +145,7 @@ func (n *Netplan) SetNetWork(ctx context.Context, addresses, dns []string, gatew
 	timeDirName := time.Now().Format("20060102")
 	backupFile := n.ConfigFile + "." + timeDirName
 	if !file.Exists(backupFile) {
-		err := os.WriteFile(backupFile, n.ConfigFileData, 0644)
+		err := os.WriteFile(backupFile, n.ConfigFileData, 0o644)
 		if err != nil {
 			return fmt.Errorf("write file , file: %s ,error: %w", backupFile, err)
 		}
@@ -156,7 +156,7 @@ func (n *Netplan) SetNetWork(ctx context.Context, addresses, dns []string, gatew
 	if err != nil {
 		return fmt.Errorf("yaml.marshal error: %w", err)
 	}
-	err = os.WriteFile(n.ConfigFile, out, 0644)
+	err = os.WriteFile(n.ConfigFile, out, 0o644)
 	if err != nil {
 		return fmt.Errorf("write file , file: %s ,error: %w", n.ConfigFile, err)
 	}

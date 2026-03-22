@@ -9,9 +9,7 @@ import (
 	"os/user"
 )
 
-var (
-	ErrBashExec = errors.New("bash执行错误")
-)
+var ErrBashExec = errors.New("bash执行错误")
 
 // Bash
 //
@@ -37,6 +35,7 @@ func Bash(ctx context.Context, cmd string) (string, int) {
 	}
 	return string(output), 0
 }
+
 func BashFormat(ctx context.Context, format string, a ...any) (string, int) {
 	cmd := fmt.Sprintf(format, a...)
 	if cmd == "" {
@@ -65,7 +64,7 @@ func BashFormat(ctx context.Context, format string, a ...any) (string, int) {
 //	@return out
 //	@return exitCode
 func BashWithWorkDir(ctx context.Context, cmd, dir string) (string, int) {
-	err := os.MkdirAll(dir, 0755)
+	err := os.MkdirAll(dir, 0o755)
 	if err != nil {
 		return fmt.Sprintf("工作目录创建失败:%s", dir), 1
 	}

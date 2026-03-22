@@ -15,5 +15,4 @@ func TestNetplan_SetNetWork(t *testing.T) {
 	if err != nil {
 		netplan.Rollback(context.Background())
 	}
-
 }

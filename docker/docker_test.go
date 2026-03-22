@@ -48,5 +48,4 @@ func TestDocker_ContainerImageSha256(t *testing.T) {
 		t.Fatal(err)
 	}
 	fmt.Println(name)
-
 }

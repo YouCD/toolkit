@@ -56,9 +56,7 @@ func CIDR2IPNetworkMask(cidr string) (string, string, error) {
 	return ipAddrObj.GetNetIPAddr().IP.String(), ipAddrObj.GetNetworkMask().String(), nil
 }
 
-var (
-	ErrInvalidCIDR = errors.New("invalid cidr")
-)
+var ErrInvalidCIDR = errors.New("invalid cidr")
 
 // CIDR2IPNet 将CIDR转换成 netIP
 func CIDR2IPNet(cidr string) (string, error) {

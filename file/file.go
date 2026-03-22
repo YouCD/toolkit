@@ -23,7 +23,7 @@ import (
 func Write(fileData []byte, filePath string, perm os.FileMode) error {
 	base := path.Dir(filePath)
 	if base != "" {
-		err := os.MkdirAll(base, 0755)
+		err := os.MkdirAll(base, 0o755)
 		if err != nil {
 			return fmt.Errorf("创建文件夹 %s failed: %w", base, err)
 		}

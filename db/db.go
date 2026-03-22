@@ -47,7 +47,6 @@ func InitDB(user, pwd, host, port, name string, l logger.Interface) {
 	db, err = gorm.Open(mysql.Open(DSN), &gorm.Config{
 		Logger: l,
 	})
-
 	if err != nil {
 		log.Println("连接数据库失败, error=" + err.Error())
 		os.Exit(1)

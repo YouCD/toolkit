@@ -12,9 +12,7 @@ import (
 	"github.com/youcd/toolkit/sysinfo/types"
 )
 
-var (
-	ErrNotFoundNetplanConfig = errors.New("not found netplan config")
-)
+var ErrNotFoundNetplanConfig = errors.New("not found netplan config")
 
 type NetworkManager interface {
 	SetNetWork(ctx context.Context, addresses, dns []string, gateway, cni string) error

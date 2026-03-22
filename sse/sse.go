@@ -56,6 +56,7 @@ func Sse(msg chan string, uri, streamID string, l net.Listener) {
 		panic(err)
 	}
 }
+
 func NewNetListen(ctx context.Context, port int) (net.Listener, string, int) {
 	address, err := toolkitNet.PhysicsCNIAddress()
 	if err != nil {

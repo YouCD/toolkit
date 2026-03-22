@@ -20,9 +20,8 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 )
 
-var (
-	ErrBadName = errors.New("镜像名称错误")
-)
+var ErrBadName = errors.New("镜像名称错误")
+
 var defaultPlatform = v1.Platform{
 	Architecture: "amd64",
 	OS:           "linux",
@@ -34,7 +33,7 @@ var defaultPlatform = v1.Platform{
 //	@param arch
 //	@return []remote.Option
 func DefaultOpt(arch string) []remote.Option {
-	var platform = defaultPlatform
+	platform := defaultPlatform
 	platform.Architecture = arch
 	opt := make([]remote.Option, 0, 2)
 	opt = append(opt,

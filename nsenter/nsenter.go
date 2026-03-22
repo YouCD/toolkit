@@ -90,7 +90,7 @@ func (c *Config) Enter(ctx context.Context) error {
 //	@return *exec.Cmd
 //	@return error
 func (c *Config) buildCommand(ctx context.Context) *exec.Cmd {
-	var args = []string{"nsenter"}
+	args := []string{"nsenter"}
 
 	args = append(args, "--target", strconv.Itoa(c.Target))
 

@@ -12,9 +12,7 @@ const (
 	IPTypeIPV6
 )
 
-var (
-	ErrInvalidIP = errors.New("错误的IP地址")
-)
+var ErrInvalidIP = errors.New("错误的IP地址")
 
 type (
 	IPType int

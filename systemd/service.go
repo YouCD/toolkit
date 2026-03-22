@@ -27,6 +27,7 @@ type Service struct {
 func (s Service) String() string {
 	return string(s.CurrentStatus)
 }
+
 func Str2ServiceStatus(str string) ServiceStatus {
 	switch strings.ToLower(str) {
 	case "running":
