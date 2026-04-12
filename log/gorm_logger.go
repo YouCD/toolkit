@@ -2,6 +2,7 @@ package log
 
 import (
 	"context"
+	"fmt"
 	"runtime"
 	"strings"
 	"time"
@@ -88,13 +89,79 @@ func getBusinessCaller() (string, int) {
 			!strings.Contains(frame.File, "runtime/") &&
 			!strings.Contains(frame.File, "zap") &&
 			!strings.Contains(frame.File, "gorm_logger.go") {
-			return frame.File, frame.Line
+
+			// 提取短路径：只保留最后两个目录和文件名
+			shortPath := extractShortPath(frame.File)
+			return shortPath, frame.Line
 		}
 		if !more {
 			break
 		}
 	}
 	return "unknown", 0
+}
+
+// extractShortPath 提取短路径，只保留最后的部分
+func extractShortPath(fullPath string) string {
+	// 尝试找到项目相关的目录
+	// 例如: /home/xxx/project/internal/repository/file.go -> repository/file.go
+	parts := strings.Split(fullPath, "/")
+
+	// 如果路径部分少于2个，返回原路径
+	if len(parts) < 2 {
+		return fullPath
+	}
+
+	// 查找关键目录如 internal, pkg, cmd 等
+	for i := len(parts) - 1; i >= 0; i-- {
+		if parts[i] == "internal" || parts[i] == "pkg" || parts[i] == "cmd" || parts[i] == "api" {
+			// 返回从关键目录的下一级开始的路径（跳过关键目录本身）
+			if i+1 < len(parts) {
+				return strings.Join(parts[i+1:], "/")
+			}
+		}
+	}
+
+	// 如果没有找到关键目录，返回最后2个部分
+	if len(parts) >= 2 {
+		return strings.Join(parts[len(parts)-2:], "/")
+	}
+
+	return fullPath
+}
+
+// colorizeSQLType 根据 SQL 类型返回带颜色的 SQL 语句
+func colorizeSQLType(sql string) string {
+	upperSQL := strings.ToUpper(strings.TrimSpace(sql))
+	var colorCode string
+
+	switch {
+	case strings.HasPrefix(upperSQL, "SELECT"):
+		colorCode = "\033[36m" // Cyan for SELECT
+	case strings.HasPrefix(upperSQL, "INSERT"):
+		colorCode = "\033[32m" // Green for INSERT
+	case strings.HasPrefix(upperSQL, "UPDATE"):
+		colorCode = "\033[33m" // Yellow for UPDATE
+	case strings.HasPrefix(upperSQL, "DELETE"):
+		colorCode = "\033[31m" // Red for DELETE
+	default:
+		colorCode = "\033[37m" // White for others
+	}
+
+	resetCode := "\033[0m"
+	return fmt.Sprintf("%s%s%s", colorCode, sql, resetCode)
+}
+
+// colorizeDuration 根据执行时间返回带颜色的持续时间
+func colorizeDuration(duration time.Duration, threshold time.Duration) string {
+	resetCode := "\033[0m"
+
+	if threshold > 0 && duration > threshold {
+		return fmt.Sprintf("\033[31m%v%s", duration, resetCode) // Red for slow queries
+	} else if duration > 100*time.Millisecond {
+		return fmt.Sprintf("\033[33m%v%s", duration, resetCode) // Yellow for moderate
+	}
+	return fmt.Sprintf("\033[32m%v%s", duration, resetCode) // Green for fast
 }
 
 // Trace 实现 Trace，用于打印 SQL
@@ -104,27 +171,43 @@ func (l *ZapGormLogger) Trace(ctx context.Context, begin time.Time, fc func() (s
 		return
 	}
 	callerFile, callerLine := getBusinessCaller()
-	// 构建 Entry
-	entry := zapcore.Entry{
-		Level:   logLevel,
-		Time:    time.Now(),
-		Caller:  zapcore.EntryCaller{Defined: true, File: callerFile, Line: callerLine},
-		Message: "GORM",
-	}
-	ce := WithCtx(ctx).Desugar().Core().Check(entry, nil)
-	if ce == nil {
-		return
-	}
+
 	elapsed := time.Since(begin)
 	sql, rows := fc()
-	// 因为 WithCtx 内部已经有了一层逻辑，这里额外跳过
+
+	coloredSQL := colorizeSQLType(sql)
+	coloredDuration := colorizeDuration(elapsed, l.SlowThreshold)
+
+	// 获取基础 logger
+	base := GetLogger()
+	if base == nil {
+		// 如果全局 logger 未初始化，使用默认 logger
+		base = defaultLogger
+	}
+
+	// 创建一个不带 caller 的 logger，避免显示 GORM 内部堆栈
+	logLogger := base.Desugar().WithOptions(zap.WithCaller(false)).Sugar()
+
+	// 保留 request_id 上下文
+	if ctx != nil {
+		if requestId, ok := ctx.Value("request_id").(string); ok && requestId != "" {
+			logLogger = logLogger.With("request_id", requestId)
+		}
+	}
+
+	// 构建带颜色的消息
 	switch {
 	case err != nil && l.LogLevel >= ormogger.Error:
-		ce.Entry.Level = zap.ErrorLevel
-		ce.Write(zap.String("SQL", sql), zap.Int64("rows", rows), zap.Duration("elapsed", elapsed), zap.Error(err))
+		msg := fmt.Sprintf("\033[35mGORM\033[0m [ERROR] %s:%d | SQL: %s | rows: %d | elapsed: %s | error: %v",
+			callerFile, callerLine, coloredSQL, rows, coloredDuration, err)
+		logLogger.Desugar().Error(msg)
 	case elapsed > l.SlowThreshold && l.SlowThreshold != 0 && l.LogLevel >= ormogger.Warn:
-		ce.Write(zap.String("SQL", sql), zap.Int64("rows", rows), zap.Duration("elapsed", elapsed))
+		msg := fmt.Sprintf("\033[35mGORM\033[0m [SLOW] %s:%d | SQL: %s | rows: %d | elapsed: %s",
+			callerFile, callerLine, coloredSQL, rows, coloredDuration)
+		logLogger.Desugar().Warn(msg)
 	case l.LogLevel >= ormogger.Info:
-		ce.Write(zap.String("SQL", sql), zap.Int64("rows", rows), zap.Duration("elapsed", elapsed))
+		msg := fmt.Sprintf("\033[35mGORM\033[0m %s:%d | SQL: %s | rows: %d | elapsed: %s",
+			callerFile, callerLine, coloredSQL, rows, coloredDuration)
+		logLogger.Desugar().Info(msg)
 	}
 }
