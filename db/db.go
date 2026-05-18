@@ -31,7 +31,7 @@ func InitDB(user, pwd, host, port, name string, l logger.Interface) {
 		DSN = fmt.Sprintf("%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local", user, host, port, name) // 连接数据库
 	}
 
-	if l != nil {
+	if l == nil {
 		l = logger.New(
 			log.New(os.Stdout, "\r\n", log.LstdFlags), // io writer
 			logger.Config{
