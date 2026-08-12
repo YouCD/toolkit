@@ -213,18 +213,15 @@ func sudo(ctx context.Context, t *types.Host) error {
 //	@param h
 //	@return error
 func getSelinux(h *types.Host) {
-	enabled := selinux.GetEnabled()
-	if enabled {
-		h.Selinux = types.SelinuxEnforcing
-		return
-	}
 	mode := selinux.EnforceMode()
-	if mode == 0 {
+	switch mode {
+	case 0:
 		h.Selinux = types.SelinuxPermissive
-		return
+	case 1:
+		h.Selinux = types.SelinuxEnforcing
+	default:
+		h.Selinux = types.SelinuxDisabled
 	}
-	h.Selinux = types.SelinuxDisabled
-	return
 }
 
 // timeFetch
