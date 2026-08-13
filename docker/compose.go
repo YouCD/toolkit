@@ -22,12 +22,12 @@ import (
 //	@param yamlFiles
 //	@return *types2.Project
 //	@return error
-func (d *Docker) ComposeLoadProjectFromYaml(ctx context.Context, projectName string, addLabel, normalization bool, otherLabel map[string]string, yamlFiles ...string) (*types2.Project, error) {
+func (d *Docker) ComposeLoadProjectFromYaml(ctx context.Context, projectName string, normalization bool, otherLabel map[string]string, yamlFiles ...string) (*types2.Project, error) {
 	opts, err := cli.NewProjectOptions(
 		yamlFiles,
 		cli.WithName(projectName),
 		// 防止创建默认网络
-		cli.WithNormalization(true),
+		cli.WithNormalization(normalization),
 		cli.WithEnvFiles(d.EnvFiles...),
 		cli.WithDotEnv,
 		cli.WithLoadOptions(loader.WithSkipValidation),
@@ -39,10 +39,7 @@ func (d *Docker) ComposeLoadProjectFromYaml(ctx context.Context, projectName str
 	if err != nil {
 		return nil, fmt.Errorf("project from options, error: %w", err)
 	}
-	if addLabel {
-		d.addLabel(projectName, p, otherLabel, yamlFiles...)
-	}
-
+	d.defaultLabel(projectName, p, otherLabel, yamlFiles...)
 	return p, nil
 }
 
@@ -60,7 +57,7 @@ func (d *Docker) ComposeStopAllProject(ctx context.Context, otherLabel map[strin
 	}
 	for projectName, configs := range sortProjects {
 		if slice.Equal(configs, yamlFiles) {
-			project, err := d.ComposeLoadProjectFromYaml(ctx, projectName, true, false, otherLabel, yamlFiles...)
+			project, err := d.ComposeLoadProjectFromYaml(ctx, projectName, true, otherLabel, yamlFiles...)
 			if err != nil {
 				return err
 			}
@@ -75,14 +72,14 @@ func (d *Docker) ComposeStopAllProject(ctx context.Context, otherLabel map[strin
 	return nil
 }
 
-// addLabel
+// defaultLabel
 //
 //	@Description: 添加标签
 //	@receiver d
 //	@param projectName
 //	@param p
 //	@param yamlFiles
-func (d *Docker) addLabel(projectName string, p *types2.Project, otherLabel map[string]string, yamlFiles ...string) {
+func (d *Docker) defaultLabel(projectName string, p *types2.Project, otherLabel map[string]string, yamlFiles ...string) {
 	for index, serviceObj := range p.Services {
 		label := map[string]string{
 			api.ProjectLabel:     projectName,
@@ -255,7 +252,7 @@ func (d *Docker) ComposeDownAllProject(ctx context.Context, yamlFiles ...string)
 
 	for projectName, configs := range sortProjects {
 		if slice.Equal(configs, yamlFiles) {
-			project, err := d.ComposeLoadProjectFromYaml(ctx, projectName, true, false, nil, yamlFiles...)
+			project, err := d.ComposeLoadProjectFromYaml(ctx, projectName, true, nil, yamlFiles...)
 			if err != nil {
 				return err
 			}
@@ -278,7 +275,7 @@ func (d *Docker) ComposeDownAllProject(ctx context.Context, yamlFiles ...string)
 //	@param yamlFiles
 //	@return error
 func (d *Docker) ComposeUp(ctx context.Context, projectName string, recreateMod string, normalization bool, otherLabel map[string]string, yamlFiles ...string) error {
-	p, err := d.ComposeLoadProjectFromYaml(ctx, projectName, true, normalization, otherLabel, yamlFiles...)
+	p, err := d.ComposeLoadProjectFromYaml(ctx, projectName, normalization, otherLabel, yamlFiles...)
 	if err != nil {
 		return fmt.Errorf("load yaml, error: %w", err)
 	}
