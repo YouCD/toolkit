@@ -14,8 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/compose-spec/compose-go/v2/cli"
-	"github.com/compose-spec/compose-go/v2/loader"
 	types2 "github.com/compose-spec/compose-go/v2/types"
 	"github.com/distribution/reference"
 	"github.com/docker/buildx/driver"
@@ -26,6 +24,7 @@ import (
 	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	containerOpt "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -35,7 +34,7 @@ import (
 	"github.com/docker/docker/libnetwork/ipamapi"
 	"github.com/docker/docker/registry"
 	"github.com/docker/go-connections/nat"
-	"github.com/duke-git/lancet/v2/slice"
+	"github.com/youcd/toolkit/log"
 	"github.com/youcd/toolkit/net"
 )
 
@@ -682,122 +681,6 @@ func (d *Docker) NetworkListByName(ctx context.Context, netName string) (*networ
 	return &list[0], nil
 }
 
-// ComposeServiceUp  docker-compose up
-//
-//	@Description:
-//	@receiver d
-//	@param p
-//	@param recreateMod api.RecreateNever
-//	@return error
-func (d *Docker) ComposeServiceUp(ctx context.Context, p *types2.Project, recreateMod string) error {
-	upOpts := api.UpOptions{
-		Create: api.CreateOptions{
-			RemoveOrphans:        true,
-			Recreate:             recreateMod,
-			RecreateDependencies: recreateMod,
-			Inherit:              true,
-			QuietPull:            true,
-		},
-		Start: api.StartOptions{
-			Project:     p,
-			OnExit:      api.CascadeStop,
-			Wait:        true,
-			WaitTimeout: time.Second * 3000,
-		},
-	}
-	err := d.ComposeService.Up(ctx, p, upOpts)
-	if err != nil {
-		return fmt.Errorf("compose up, error: %w", err)
-	}
-	return nil
-}
-
-// ComposeServiceRestart
-//
-//	@Description: 服务重启
-//	@receiver d
-//	@param p
-//	@return error
-func (d *Docker) ComposeServiceRestart(ctx context.Context, p *types2.Project) error {
-	Opts := api.RestartOptions{
-		Project: p,
-		// Timeout:  nil,
-		// Services: nil,
-		// NoDeps:   false,
-	}
-
-	err := d.ComposeService.Restart(ctx, p.Name, Opts)
-	if err != nil {
-		return fmt.Errorf("compose restart, error: %w", err)
-	}
-	return nil
-}
-
-// ComposeFilterSvcFromProject
-//
-//	@Description: 从Project中过滤出匹配的Services
-//	@receiver d
-//	@param svcName
-//	@param project
-//	@return *types2.Project
-func (d *Docker) ComposeFilterSvcFromProject(svcName []string, project *types2.Project) *types2.Project {
-	result := new(types2.Project)
-	result.Networks = project.Networks
-	delete(result.Networks, "default")
-	result.Extensions = project.Extensions
-	result.Name = project.Name
-	services := make(types2.Services)
-	for _, service := range project.Services {
-		if slice.Contain(svcName, service.Name) {
-			services[service.Name] = service
-		}
-	}
-	result.Services = services
-	return result
-}
-
-// ComposeList
-//
-//	@Description: Compose List
-//	@receiver d
-//	@return []api.Stack
-//	@return error
-func (d *Docker) ComposeList(ctx context.Context) ([]api.Stack, error) {
-	opts := api.ListOptions{
-		All: true,
-	}
-	list, err := d.ComposeService.List(ctx, opts)
-	if err != nil {
-		return nil, fmt.Errorf("compose ls, error: %w", err)
-	}
-	return list, nil
-}
-
-// ComposeListByName
-//
-//	@Description: 按projectName列出compose项目
-//	@receiver d
-//	@param projectName
-//	@return *api.Stack
-//	@return error
-func (d *Docker) ComposeListByName(ctx context.Context, projectName string) (*api.Stack, error) {
-	opts := api.ListOptions{
-		All: true,
-	}
-	list, err := d.ComposeService.List(ctx, opts)
-	if err != nil {
-		return nil, fmt.Errorf("compose ls, error: %w", err)
-	}
-
-	for _, stack := range list {
-		if stack.Name == projectName {
-			return &stack, nil
-		}
-	}
-
-	return nil, ErrDockerComposeProjectNotFound
-}
-
 // encodedAuth
 //
 //	@Description: 从配置文件解码认证信息
@@ -824,30 +707,9 @@ func encodedAuth(ref reference.Named, configFile driver.Auth) (string, error) {
 	return base64.URLEncoding.EncodeToString(buf), nil
 }
 
-// ComposeYamlRead
-//
-//	@Description: 从yaml中读取compose项目
-//	@param file
-//	@return *types2.Project
-//	@return error
-func ComposeYamlRead(ctx context.Context, file string, envFiles ...string) (*types2.Project, error) {
-	opts, err := cli.NewProjectOptions(
-		[]string{file},
-		//  关闭一致性校验
-		cli.WithConsistency(false),
-		cli.WithEnvFiles(envFiles...),
-		cli.WithDotEnv,
-		cli.WithLoadOptions(loader.WithSkipValidation),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("NewProjectOptions() err:%w", err)
-	}
-	//nolint:wrapcheck
-	return opts.LoadProject(ctx)
-}
-
 type LogFilter func(logs string) bool
 
+// ContainerLogs 容器日志
 func (d *Docker) ContainerLogs(ctx context.Context, containerName string, options *container.LogsOptions, filter LogFilter) error {
 	// 默认选项
 	defaultOptions := &container.LogsOptions{ShowStdout: true, Follow: true}
@@ -1000,4 +862,121 @@ func (d *Docker) imageLoadFromIOReader(ctx context.Context, input io.Reader) err
 		return fmt.Errorf("加载镜像 error: %w", err)
 	}
 	return nil
+}
+
+// NewContainerExec
+//
+//	@Description: 创建一个容器并执行命令
+//	@receiver d
+//	@param ctx
+//	@param container
+//	@param execCmd
+//	@param image
+//	@param mounts
+//	@param networkingConfig
+//	@return string
+//	@return error
+func (d *Docker) NewContainerExec(ctx context.Context, container, execCmd, image string, mounts []mount.Mount, networkingConfig *network.NetworkingConfig) (string, error) {
+	if d.ContainerIsExits(ctx, container) {
+		log.WithCtx(ctx).Infof("删除已存在的 %s 容器", container)
+		if err := d.ContainerRemove(ctx, container); err != nil {
+			log.WithCtx(ctx).Error(err)
+			return "", fmt.Errorf("删除 %s 容器,err:%w", container, err)
+		}
+	}
+
+	// 创建容器
+	resp, err := d.DockerCLIClient.Client().ContainerCreate(
+		ctx, &containerOpt.Config{
+			Image:        image,
+			Cmd:          []string{"sh", "-c", fmt.Sprintf("exec %s", execCmd)},
+			AttachStdout: true,
+		},
+		&containerOpt.HostConfig{
+			Mounts:     mounts,
+			AutoRemove: true, // 自动删除
+		}, networkingConfig, nil, container,
+	)
+	if err != nil {
+		return "", fmt.Errorf("%s 创建 error: %w", container, err)
+	}
+
+	err = d.DockerCLIClient.Client().ContainerStart(ctx, resp.ID, containerOpt.StartOptions{})
+	if err != nil {
+		return "", fmt.Errorf("启动 %s error: %w", container, err)
+	}
+	resultC, errC := d.DockerCLIClient.Client().ContainerWait(ctx, resp.ID, containerOpt.WaitConditionNotRunning)
+	select {
+	case err := <-errC:
+		return "", fmt.Errorf("%s启动失败,err:%w", container, err)
+	case <-resultC:
+	}
+
+	// 获取容器的输出日志
+	reader, err := d.DockerCLIClient.Client().ContainerLogs(ctx, resp.ID, containerOpt.LogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Follow:     true,
+	})
+	if err != nil {
+		return "", fmt.Errorf("获取 %s 日志 error: %w", container, err)
+	}
+
+	defer func() {
+		_ = reader.Close()
+	}()
+
+	var buf bytes.Buffer
+	_, err = io.Copy(&buf, reader)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return "", fmt.Errorf("获取%s日志 error: %w", container, err)
+	}
+
+	return buf.String(), nil
+}
+
+// Exec 执行命令
+func (d *Docker) Exec(ctx context.Context, container, cmd string) (string, int, error) {
+	execOpts := containerOpt.ExecOptions{
+		AttachStdout: true,
+		AttachStderr: true,
+		Cmd:          []string{"sh", "-c", cmd},
+	}
+	inspect, err := d.Inspect(ctx, container)
+	if err != nil {
+		log.WithCtx(ctx).Error(err)
+		return "", 0, fmt.Errorf("inspect() error: %w", err)
+	}
+
+	execID, err := d.DockerCLIClient.Client().ContainerExecCreate(ctx, inspect.ID, execOpts)
+	if err != nil {
+		log.WithCtx(ctx).Error(err)
+		return "", 0, fmt.Errorf("ContainerExecCreate() error: %w", err)
+	}
+
+	// 创建 exec 配置
+	execAttachConfig := containerOpt.ExecAttachOptions{
+		Tty: true,
+	}
+
+	// 启动 exec 并获取输出
+	resp, err := d.DockerCLIClient.Client().ContainerExecAttach(ctx, execID.ID, execAttachConfig)
+	if err != nil {
+		return "", 0, fmt.Errorf("ContainerExecAttach() error: %w", err)
+	}
+	defer resp.Close()
+
+	// 读取命令输出
+	output, err := io.ReadAll(resp.Reader)
+	if err != nil {
+		return "", 0, fmt.Errorf("reading output error: %w", err)
+	}
+
+	// 等待命令执行完成并检查结果
+	inspectResp, err := d.DockerCLIClient.Client().ContainerExecInspect(ctx, execID.ID)
+	if err != nil {
+		return "", 0, fmt.Errorf("ContainerExecInspect error: %w", err)
+	}
+
+	return string(output), inspectResp.ExitCode, nil
 }

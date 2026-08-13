@@ -94,7 +94,7 @@ func ExtractTarZstOrGzipFile(src, dest string, progressChan chan string) error {
 		case tar.TypeReg:
 			pg.FileCount++
 			pushMsg(pg, progressChan)
-			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 				return fmt.Errorf("创建父目录失败: %s,err：%w", filepath.Dir(target), err)
 			}
 			//nolint:gosec

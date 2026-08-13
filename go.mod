@@ -39,6 +39,8 @@ require (
 	gorm.io/gorm v1.31.0
 )
 
+replace github.com/youcd/toolkit => /home/ycd/self_data/source_code/toolkit
+
 require (
 	atomicgo.dev/cursor v0.2.0 // indirect
 	atomicgo.dev/keyboard v0.2.9 // indirect
