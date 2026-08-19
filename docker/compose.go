@@ -250,19 +250,15 @@ func (d *Docker) ComposeDownAllProject(ctx context.Context, yamlFiles ...string)
 		return fmt.Errorf("ParserYamlFiles() error: %w", err)
 	}
 
-	for projectName, configs := range sortProjects {
-		if slice.Equal(configs, yamlFiles) {
-			project, err := d.ComposeLoadProjectFromYaml(ctx, projectName, true, nil, yamlFiles...)
-			if err != nil {
-				return err
-			}
-
-			if err := d.ComposeService.Down(ctx, projectName, api.DownOptions{Project: project}); err != nil {
-				return fmt.Errorf("ComposeService.Down(),project:%s yamls:%s,err: %w", projectName, strings.Join(yamlFiles, ","), err)
-			}
-			log.WithCtx(ctx).Infof("ComposeService.Down(),project:%s yaml:%s", projectName, strings.Join(yamlFiles, ","))
-			return nil
+	for projectName := range sortProjects {
+		project, err := d.ComposeLoadProjectFromYaml(ctx, projectName, true, nil, yamlFiles...)
+		if err != nil {
+			return err
 		}
+		if err := d.ComposeService.Down(ctx, projectName, api.DownOptions{Project: project}); err != nil {
+			return fmt.Errorf("ComposeService.Down(),project:%s yamls:%s,err: %w", projectName, strings.Join(yamlFiles, ","), err)
+		}
+		return nil
 	}
 
 	return nil
