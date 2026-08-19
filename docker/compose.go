@@ -10,7 +10,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/loader"
 	types2 "github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v5/pkg/api"
 	"github.com/duke-git/lancet/v2/slice"
 	"github.com/youcd/toolkit/log"
 )

@@ -3,7 +3,6 @@ package docker
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 )
@@ -18,13 +17,10 @@ func TestDocker_ContainerLogs(t *testing.T) {
 	}
 
 	logFilter := func(logs string) bool {
-		if strings.Contains(logs, "MySQL init process done. Ready for start up.") {
-			fmt.Println("初始化完毕")
-			return false
-		}
+		fmt.Println(logs)
 		return false
 	}
-	err = docker.ContainerLogs(ctx, "mysql", nil, logFilter)
+	err = docker.ContainerLogs(ctx, "nginx", nil, logFilter)
 	if err != nil {
 		t.Fatal(err)
 	}

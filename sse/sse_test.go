@@ -2,6 +2,7 @@ package sse
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -14,12 +15,12 @@ import (
 func Test_sse(t *testing.T) {
 	buffer := bytes.NewBuffer(make([]byte, 1024))
 	log.InitBuffer(buffer)
-	log.Infof("hello")
+	log.WithCtx(context.Background()).Infof("hello")
 	send := 0
 	go func() {
 		for {
 			send++
-			log.Infof("hello, 第 %d 次， %s", send, time.Now())
+			log.WithCtx(context.Background()).Infof("hello, 第 %d 次， %s", send, time.Now())
 			fmt.Printf("第 %d 次\n", send)
 			time.Sleep(time.Second * 2)
 		}
@@ -33,7 +34,7 @@ func Test_sse(t *testing.T) {
 			// fmt.Println("内容：  ", string(log.LogBuffer))
 			line, err := buffer.ReadString('\n')
 			if err != nil && !errors.Is(io.EOF, err) {
-				log.Errorf("read error: %s", err)
+				log.WithCtx(context.Background()).Errorf("read error: %s", err)
 			}
 			msgChan <- line
 
@@ -51,5 +52,4 @@ func Test_sse(t *testing.T) {
 			// msgChan <- string(r)
 		}
 	}()
-	Sse(msgChan)
 }

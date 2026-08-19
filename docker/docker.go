@@ -16,13 +16,11 @@ import (
 
 	types2 "github.com/compose-spec/compose-go/v2/types"
 	"github.com/distribution/reference"
-	"github.com/docker/buildx/driver"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/cli/cli/config/configfile"
 	cliflags "github.com/docker/cli/cli/flags"
-	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/compose"
-	"github.com/docker/compose/v2/pkg/progress"
-	"github.com/docker/docker/api/types"
+	"github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/compose"
 	"github.com/docker/docker/api/types/container"
 	containerOpt "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/events"
@@ -52,14 +50,13 @@ var (
 var d *Docker
 
 type Docker struct {
-	ComposeService  api.Service
+	ComposeService  api.Compose
 	DockerCLIClient command.Cli
+	Client          client.APIClient
 	EnvFiles        []string
 }
 
 func NewDocker(ctx context.Context, envFiles ...string) (*Docker, error) {
-	// 关闭进度条
-	progress.Mode = progress.ModeQuiet
 	// 创建docker client
 	dockerClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -72,7 +69,7 @@ func NewDocker(ctx context.Context, envFiles ...string) (*Docker, error) {
 	}
 
 	// 创建docker cli  client
-	dockerCli, err := command.NewDockerCli(command.WithAPIClient(dockerClient))
+	dockerCli, err := command.NewDockerCli()
 	if err != nil {
 		panic(err)
 	}
@@ -82,18 +79,21 @@ func NewDocker(ctx context.Context, envFiles ...string) (*Docker, error) {
 		return nil, fmt.Errorf("new docker cli client error: %w", err)
 	}
 	// 创建compose service
-	service := compose.NewComposeService(dockerCli)
-
+	composeService, err := compose.NewComposeService(dockerCli)
+	if err != nil {
+		return nil, fmt.Errorf("new compose service error: %w", err)
+	}
 	d = &Docker{
-		ComposeService:  service,
+		ComposeService:  composeService,
 		DockerCLIClient: dockerCli,
+		Client:          dockerClient,
 		EnvFiles:        envFiles,
 	}
 	return d, nil
 }
 
 func (d *Docker) Close() {
-	_ = d.DockerCLIClient.Client().Close()
+	_ = d.Client.Close()
 }
 
 // watchContainerCallback 回调函数
@@ -105,7 +105,7 @@ type watchContainerCallback func(ctx context.Context, containerName string, rowD
 //	@receiver d
 //	@param watch
 func (d *Docker) WatchContainerCreate(ctx context.Context, action events.Action, watch watchContainerCallback) error {
-	evs, errs := d.DockerCLIClient.Client().Events(ctx, events.ListOptions{
+	evs, errs := d.Client.Events(ctx, events.ListOptions{
 		Filters: filters.NewArgs(filters.Arg("type", string(events.ContainerEventType))), // 搞一个事件过滤器
 	})
 
@@ -257,7 +257,7 @@ func (d *Docker) ContainerStart(ctx context.Context, containers ...string) error
 			errs = append(errs, err)
 			continue
 		}
-		err = d.DockerCLIClient.Client().ContainerStart(ctx, inspect.ID, container.StartOptions{})
+		err = d.Client.ContainerStart(ctx, inspect.ID, container.StartOptions{})
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -275,9 +275,9 @@ func (d *Docker) ContainerStart(ctx context.Context, containers ...string) error
 //	@param ctx
 //	@return []string
 //	@return error
-func (d *Docker) ContainerList(ctx context.Context) ([]types.Container, error) {
+func (d *Docker) ContainerList(ctx context.Context) ([]container.Summary, error) {
 	//nolint:wrapcheck
-	return d.DockerCLIClient.Client().ContainerList(ctx, container.ListOptions{})
+	return d.Client.ContainerList(ctx, container.ListOptions{})
 }
 
 // ContainerStop
@@ -294,7 +294,7 @@ func (d *Docker) ContainerStop(ctx context.Context, containers ...string) error 
 			errs = append(errs, err)
 			continue
 		}
-		err = d.DockerCLIClient.Client().ContainerStop(ctx, inspect.ID, container.StopOptions{})
+		err = d.Client.ContainerStop(ctx, inspect.ID, container.StopOptions{})
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -377,7 +377,7 @@ func (d *Docker) ContainerUpdateImage(ctx context.Context, containerName string,
 			return err
 		}
 
-		err = d.DockerCLIClient.Client().ContainerStart(ctx, resp.ID, container.StartOptions{})
+		err = d.Client.ContainerStart(ctx, resp.ID, container.StartOptions{})
 		if err != nil {
 			// 某些容器无用户配置
 			if strings.Contains(err.Error(), "no matching entries in passwd file") {
@@ -403,7 +403,7 @@ func (d *Docker) ContainerUpdateImage(ctx context.Context, containerName string,
 //	@return container.CreateResponse
 //	@return error
 func (d *Docker) ContainerCreate(ctx context.Context, containerName string, inspectJSON *container.InspectResponse, networkingConfig *network.NetworkingConfig) (container.CreateResponse, error) {
-	resp, err := d.DockerCLIClient.Client().ContainerCreate(ctx,
+	resp, err := d.Client.ContainerCreate(ctx,
 		inspectJSON.Config,
 		inspectJSON.HostConfig, networkingConfig, nil, containerName)
 	if err != nil {
@@ -419,7 +419,7 @@ func (d *Docker) ContainerCreate(ctx context.Context, containerName string, insp
 //	@param container
 //	@return error
 func (d *Docker) ContainerIsExits(ctx context.Context, containerName string) bool {
-	inspect, err := d.DockerCLIClient.Client().ContainerList(ctx, container.ListOptions{All: true, Filters: filters.NewArgs(filters.KeyValuePair{Key: "name", Value: containerName})})
+	inspect, err := d.Client.ContainerList(ctx, container.ListOptions{All: true, Filters: filters.NewArgs(filters.KeyValuePair{Key: "name", Value: containerName})})
 	if err != nil {
 		return false
 	}
@@ -437,7 +437,7 @@ func (d *Docker) ContainerIsExits(ctx context.Context, containerName string) boo
 //	@return *container.InspectResponse
 //	@return error
 func (d *Docker) Inspect(ctx context.Context, containerName string) (*container.InspectResponse, error) {
-	inspect, err := d.DockerCLIClient.Client().ContainerInspect(ctx, containerName)
+	inspect, err := d.Client.ContainerInspect(ctx, containerName)
 	if err != nil {
 		return nil, fmt.Errorf("%s :inspect error,err: %w", containerName, err)
 	}
@@ -473,7 +473,7 @@ func (d *Docker) ContainerRemove(ctx context.Context, containerName string) erro
 		return fmt.Errorf("inspect() error: %w", err)
 	}
 
-	err = d.DockerCLIClient.Client().ContainerRemove(ctx, containerJSON.ID, container.RemoveOptions{Force: true})
+	err = d.Client.ContainerRemove(ctx, containerJSON.ID, container.RemoveOptions{Force: true})
 	if err != nil {
 		return fmt.Errorf("%s :ContainerRemove error, err: %w", containerName, err)
 	}
@@ -504,7 +504,7 @@ func (d *Docker) CreateRegistry(ctx context.Context, imageName, repoPath, hostPo
 			return fmt.Errorf("load镜像 error: %w", err)
 		}
 	} else {
-		imageResp, err := d.DockerCLIClient.Client().ImagePull(ctx, registryName, image.PullOptions{})
+		imageResp, err := d.Client.ImagePull(ctx, registryName, image.PullOptions{})
 		if err != nil {
 			return fmt.Errorf("pull registry image error: %w", err)
 		}
@@ -541,7 +541,7 @@ func (d *Docker) CreateRegistry(ctx context.Context, imageName, repoPath, hostPo
 	netPort[natPort] = portList
 
 	// 创建容器
-	resp, err := d.DockerCLIClient.Client().ContainerCreate(ctx,
+	resp, err := d.Client.ContainerCreate(ctx,
 		&container.Config{
 			Image:        registryName,
 			ExposedPorts: exports,
@@ -558,7 +558,7 @@ func (d *Docker) CreateRegistry(ctx context.Context, imageName, repoPath, hostPo
 		return fmt.Errorf("registry创建 error: %w", err)
 	}
 
-	err = d.DockerCLIClient.Client().ContainerStart(ctx, resp.ID, container.StartOptions{})
+	err = d.Client.ContainerStart(ctx, resp.ID, container.StartOptions{})
 	if err != nil {
 		return fmt.Errorf("启动registry error: %w", err)
 	}
@@ -596,7 +596,7 @@ func (d *Docker) ImagePull(ctx context.Context, regImage string, newTagFunc func
 		return err
 	}
 
-	imageResp, err := d.DockerCLIClient.Client().ImagePull(ctx, regImage, image.PullOptions{RegistryAuth: authConfigs})
+	imageResp, err := d.Client.ImagePull(ctx, regImage, image.PullOptions{RegistryAuth: authConfigs})
 	if err != nil {
 		return fmt.Errorf("pull镜像:%s error: %w", regImage, err)
 	}
@@ -610,11 +610,11 @@ func (d *Docker) ImagePull(ctx context.Context, regImage string, newTagFunc func
 	}
 	if newTagFunc != nil {
 		newName := newTagFunc(regImage)
-		err = d.DockerCLIClient.Client().ImageTag(ctx, regImage, newName)
+		err = d.Client.ImageTag(ctx, regImage, newName)
 		if err != nil {
 			return fmt.Errorf("tag镜像:%s error: %w", newName, err)
 		}
-		_, err = d.DockerCLIClient.Client().ImageRemove(ctx, regImage, image.RemoveOptions{})
+		_, err = d.Client.ImageRemove(ctx, regImage, image.RemoveOptions{})
 		if err != nil {
 			return fmt.Errorf("remove镜像:%s error: %w", regImage, err)
 		}
@@ -630,7 +630,7 @@ func (d *Docker) ImagePull(ctx context.Context, regImage string, newTagFunc func
 //	@param ipCIDR
 //	@return error
 func (d *Docker) NetworkCreate(ctx context.Context, netName, ipCIDR string) error {
-	list, err := d.DockerCLIClient.Client().NetworkList(ctx, network.ListOptions{Filters: filters.NewArgs(filters.KeyValuePair{Key: "name", Value: netName})})
+	list, err := d.Client.NetworkList(ctx, network.ListOptions{Filters: filters.NewArgs(filters.KeyValuePair{Key: "name", Value: netName})})
 	if err != nil {
 		return fmt.Errorf("list net %s,err:%w", netName, err)
 	}
@@ -651,7 +651,7 @@ func (d *Docker) NetworkCreate(ctx context.Context, netName, ipCIDR string) erro
 		},
 	}
 
-	_, err = d.DockerCLIClient.Client().NetworkCreate(ctx, netName, options)
+	_, err = d.Client.NetworkCreate(ctx, netName, options)
 	if err != nil {
 		if errors.Is(err, ipamapi.ErrPoolOverlap) {
 			return ErrDockerNetworkPollExist
@@ -668,10 +668,10 @@ func (d *Docker) NetworkCreate(ctx context.Context, netName, ipCIDR string) erro
 //	@receiver d
 //	@param ctx
 //	@param netName
-//	@return []types.NetworkResource
+//	@return *network.Summary
 //	@return error
 func (d *Docker) NetworkListByName(ctx context.Context, netName string) (*network.Summary, error) {
-	list, err := d.DockerCLIClient.Client().NetworkList(ctx, network.ListOptions{Filters: filters.NewArgs(filters.KeyValuePair{Key: "name", Value: netName})})
+	list, err := d.Client.NetworkList(ctx, network.ListOptions{Filters: filters.NewArgs(filters.KeyValuePair{Key: "name", Value: netName})})
 	if err != nil {
 		return nil, fmt.Errorf("list Network,err:%w", err)
 	}
@@ -688,7 +688,7 @@ func (d *Docker) NetworkListByName(ctx context.Context, netName string) (*networ
 //	@param configFile
 //	@return string
 //	@return error
-func encodedAuth(ref reference.Named, configFile driver.Auth) (string, error) {
+func encodedAuth(ref reference.Named, configFile *configfile.ConfigFile) (string, error) {
 	repoInfo, err := registry.ParseRepositoryInfo(ref)
 	if err != nil {
 		return "", fmt.Errorf("parse repository info, error: %w", err)
@@ -716,7 +716,7 @@ func (d *Docker) ContainerLogs(ctx context.Context, containerName string, option
 	if options != nil {
 		defaultOptions = options
 	}
-	reader, err := d.DockerCLIClient.Client().ContainerLogs(ctx, containerName, *defaultOptions)
+	reader, err := d.Client.ContainerLogs(ctx, containerName, *defaultOptions)
 	if err != nil {
 		return fmt.Errorf("container logs, error: %w", err)
 	}
@@ -760,7 +760,7 @@ func (d *Docker) ContainerLogs(ctx context.Context, containerName string, option
 //	@Description: 获取容器镜像sha256
 //	@receiver d
 //	@param ctx
-//	@return []types.Container
+//	@return []container.Summary
 //	@return error
 func (d *Docker) ContainerImageSha256(ctx context.Context, name string) (string, error) {
 	inspect, err := d.Inspect(ctx, name)
@@ -857,7 +857,7 @@ func (d *Docker) matchAuthConfig(regImage string) (string, error) {
 //	@param input
 //	@return error
 func (d *Docker) imageLoadFromIOReader(ctx context.Context, input io.Reader) error {
-	_, err := d.DockerCLIClient.Client().ImageLoad(ctx, input, client.ImageLoadWithQuiet(true))
+	_, err := d.Client.ImageLoad(ctx, input, client.ImageLoadWithQuiet(true))
 	if err != nil {
 		return fmt.Errorf("加载镜像 error: %w", err)
 	}
@@ -886,7 +886,7 @@ func (d *Docker) NewContainerExec(ctx context.Context, container, execCmd, image
 	}
 
 	// 创建容器
-	resp, err := d.DockerCLIClient.Client().ContainerCreate(
+	resp, err := d.Client.ContainerCreate(
 		ctx, &containerOpt.Config{
 			Image:        image,
 			Cmd:          []string{"sh", "-c", fmt.Sprintf("exec %s", execCmd)},
@@ -901,11 +901,11 @@ func (d *Docker) NewContainerExec(ctx context.Context, container, execCmd, image
 		return "", fmt.Errorf("%s 创建 error: %w", container, err)
 	}
 
-	err = d.DockerCLIClient.Client().ContainerStart(ctx, resp.ID, containerOpt.StartOptions{})
+	err = d.Client.ContainerStart(ctx, resp.ID, containerOpt.StartOptions{})
 	if err != nil {
 		return "", fmt.Errorf("启动 %s error: %w", container, err)
 	}
-	resultC, errC := d.DockerCLIClient.Client().ContainerWait(ctx, resp.ID, containerOpt.WaitConditionNotRunning)
+	resultC, errC := d.Client.ContainerWait(ctx, resp.ID, containerOpt.WaitConditionNotRunning)
 	select {
 	case err := <-errC:
 		return "", fmt.Errorf("%s启动失败,err:%w", container, err)
@@ -913,7 +913,7 @@ func (d *Docker) NewContainerExec(ctx context.Context, container, execCmd, image
 	}
 
 	// 获取容器的输出日志
-	reader, err := d.DockerCLIClient.Client().ContainerLogs(ctx, resp.ID, containerOpt.LogsOptions{
+	reader, err := d.Client.ContainerLogs(ctx, resp.ID, containerOpt.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     true,
@@ -948,7 +948,7 @@ func (d *Docker) Exec(ctx context.Context, container, cmd string) (string, int, 
 		return "", 0, fmt.Errorf("inspect() error: %w", err)
 	}
 
-	execID, err := d.DockerCLIClient.Client().ContainerExecCreate(ctx, inspect.ID, execOpts)
+	execID, err := d.Client.ContainerExecCreate(ctx, inspect.ID, execOpts)
 	if err != nil {
 		log.WithCtx(ctx).Error(err)
 		return "", 0, fmt.Errorf("ContainerExecCreate() error: %w", err)
@@ -960,7 +960,7 @@ func (d *Docker) Exec(ctx context.Context, container, cmd string) (string, int, 
 	}
 
 	// 启动 exec 并获取输出
-	resp, err := d.DockerCLIClient.Client().ContainerExecAttach(ctx, execID.ID, execAttachConfig)
+	resp, err := d.Client.ContainerExecAttach(ctx, execID.ID, execAttachConfig)
 	if err != nil {
 		return "", 0, fmt.Errorf("ContainerExecAttach() error: %w", err)
 	}
@@ -973,7 +973,7 @@ func (d *Docker) Exec(ctx context.Context, container, cmd string) (string, int, 
 	}
 
 	// 等待命令执行完成并检查结果
-	inspectResp, err := d.DockerCLIClient.Client().ContainerExecInspect(ctx, execID.ID)
+	inspectResp, err := d.Client.ContainerExecInspect(ctx, execID.ID)
 	if err != nil {
 		return "", 0, fmt.Errorf("ContainerExecInspect error: %w", err)
 	}

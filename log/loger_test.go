@@ -17,7 +17,7 @@ func TestSetLogLevel(t *testing.T) {
 		//	LocalTime:  true,
 		//},
 	}
-	Init(nil)
+	Init(cfg)
 	WithCtx(context.Background()).Info("Info")
 	SetLogLevel("debug")
 	WithCtx(context.Background()).Debug("Debug")
