@@ -286,3 +286,19 @@ func (d *Docker) ComposeUp(ctx context.Context, projectName string, recreateMod 
 	}
 	return nil
 }
+
+// WaitForProject 等待项目启动完成
+func (d *Docker) WaitForProject(ctx context.Context, projectNameBigData string) {
+	for {
+		list, _ := d.ComposeList(ctx)
+		for _, p := range list {
+			if p.Name == projectNameBigData {
+				return
+			}
+		}
+		time.Sleep(time.Second * 3)
+	}
+}
+
+
+

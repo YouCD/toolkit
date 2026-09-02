@@ -980,3 +980,24 @@ func (d *Docker) Exec(ctx context.Context, container, cmd string) (string, int, 
 
 	return string(output), inspectResp.ExitCode, nil
 }
+
+// SetMountSourcePerm 设置挂载源的权限
+func (d *Docker) SetMountSourcePerm(ctx context.Context, containerName, destination string, fileMode os.FileMode, preSet func(source string, fileMode os.FileMode) error) error {
+	inspect, err := d.Inspect(ctx, containerName)
+	if err != nil {
+		return fmt.Errorf("inspect() error: %w", err)
+	}
+	for _, point := range inspect.Mounts {
+		if point.Destination == destination && point.Type == "bind" {
+			if preSet != nil {
+				if err := preSet(point.Source, fileMode); err != nil {
+					return fmt.Errorf("preSet() error: %w", err)
+				}
+			}
+			if err := os.Chmod(point.Source, fileMode); err != nil {
+				return fmt.Errorf("chmod() error: %w", err)
+			}
+		}
+	}
+	return nil
+}
