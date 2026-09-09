@@ -299,6 +299,3 @@ func (d *Docker) WaitForProject(ctx context.Context, projectNameBigData string) 
 		time.Sleep(time.Second * 3)
 	}
 }
-
-
-
